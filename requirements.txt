@@ -5,3 +5,9 @@ tqdm
 requests
 click>=7
 natsort
+pillow
+dghs-imgutils>=0.4.8
+numpy<2
+pandas
+pyyaml>=6
+pyarrow
