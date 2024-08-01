@@ -1,0 +1,7 @@
+hbutils>=0.10.0
+hfutils>=0.3.4
+huggingface_hub
+tqdm
+requests
+click>=7
+natsort
