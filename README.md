@@ -2,8 +2,8 @@
 
 [![PyPI](https://img.shields.io/pypi/v/felinewhisker)](https://pypi.org/project/felinewhisker/)
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/felinewhisker)
-![Loc](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/narugo1992/b98a0fd1468c4858abf2a355bc9b4039/raw/loc.json)
-![Comments](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/narugo1992/b98a0fd1468c4858abf2a355bc9b4039/raw/comments.json)
+![Loc](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/narugo1992/b7c1bf99f08623cecd4d40383b1808a9/raw/loc.json)
+![Comments](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/narugo1992/b7c1bf99f08623cecd4d40383b1808a9/raw/comments.json)
 
 [![Code Test](https://github.com/deepghs/felinewhisker/workflows/Code%20Test/badge.svg)](https://github.com/deepghs/felinewhisker/actions?query=workflow%3A%22Code+Test%22)
 [![Package Release](https://github.com/deepghs/felinewhisker/workflows/Package%20Release/badge.svg)](https://github.com/deepghs/felinewhisker/actions?query=workflow%3A%22Package+Release%22)
