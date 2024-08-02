@@ -1,22 +1,21 @@
 import json
 import os
-import random
 import shutil
 from typing import Optional, List
 
 import numpy as np
 import pandas as pd
-import yaml
+from PIL import Image
 from hbutils.string import plural_word
 from hbutils.system import TemporaryDirectory
 from hfutils.index import tar_get_index_info, hf_tar_file_download
 from hfutils.operate import upload_directory_as_directory, get_hf_fs, get_hf_client
-from hfutils.utils import hf_normpath, hf_fs_path, parse_hf_fs_path, number_to_tag
+from hfutils.utils import hf_normpath, hf_fs_path, parse_hf_fs_path
 from huggingface_hub import CommitOperationAdd, CommitOperationDelete
 from natsort import natsorted
 
 from .base import DatasetRepository
-from ..utils import padding_align
+from ..tasks import create_readme
 
 
 class HfOnlineRepository(DatasetRepository):
@@ -63,7 +62,6 @@ class HfOnlineRepository(DatasetRepository):
 
     def _read(self):
         hf_fs = get_hf_fs(hf_token=os.environ.get('HF_TOKEN'))
-        hf_client = get_hf_client(hf_token=os.environ.get('HF_TOKEN'))
 
         meta_info = json.loads(hf_fs.read_text(hf_fs_path(
             repo_id=self._repo_id,
@@ -110,68 +108,38 @@ class HfOnlineRepository(DatasetRepository):
                 records[item['id']] = item
             files_to_drop.append(filename)
 
+        def _load_image_by_id(id_: str):
+            selected_item = df[df['id'] == id_].to_dict('records')[0]
+            with TemporaryDirectory() as ttd:
+                tmp_image_file = os.path.join(
+                    ttd, f'image{os.path.splitext(selected_item["filename"])[1]}')
+                hf_tar_file_download(
+                    repo_id=self._repo_id,
+                    repo_type='dataset',
+                    revision=self._revision,
+                    archive_in_repo=selected_item['archive_file'],
+                    file_in_archive=selected_item['filename'],
+                    local_file=tmp_image_file,
+                )
+
+                image = Image.open(tmp_image_file)
+                image.load()
+                return image
+
         with TemporaryDirectory() as td:
             df = pd.DataFrame(list(records.values()))
             df = df.sort_values(by=['updated_at', 'id'], ascending=[False, True])
             df.to_parquet(os.path.join(td, 'data.parquet'), engine='pyarrow', index=False)
 
             md_file = os.path.join(td, 'README.md')
-            samples_dir = os.path.join(td, 'samples')
-            os.makedirs(samples_dir, exist_ok=True)
             with open(md_file, 'w') as f:
-                readme_metadata = self.meta_info['readme_metadata']
-                readme_metadata['task_categories'] = ['image-classification']
-                readme_metadata['size_categories'] = [number_to_tag(len(df))]
-                print(f'---', file=f)
-                yaml.dump(readme_metadata, f, default_flow_style=False, sort_keys=False)
-                print(f'---', file=f)
-                print(f'', file=f)
-
-                print(f'# Image Classification - {self.meta_info["name"]}', file=f)
-                print(f'', file=f)
-                labels = self.meta_info['labels']
-                print(f'{plural_word(len(labels), "label")}, {plural_word(len(df), "sample")} in total, '
-                      f'listed as the following:', file=f)
-                print(f'', file=f)
-
-                sample_cnt = 8
-                samples = []
-                for label in labels:
-                    df_label = df[df['annotation'] == label]
-                    row = {
-                        'Label': label,
-                        'Samples': f'{len(df_label)} ({len(df_label) / len(df) * 100.0:.1f}%)',
-                    }
-                    ids = df_label['id'].tolist()
-                    if len(ids) > sample_cnt:
-                        ids = random.sample(ids, k=sample_cnt)
-                    selected = df_label[df_label['id'].isin(ids)].to_dict('records')
-                    for i in range(sample_cnt):
-                        if i < len(selected):
-                            selected_item = selected[i]
-                            dst_image_file = os.path.join(samples_dir, label, f'{i}.webp')
-                            with TemporaryDirectory() as ttd:
-                                tmp_image_file = os.path.join(
-                                    ttd, f'image{os.path.splitext(selected_item["filename"])[1]}')
-                                hf_tar_file_download(
-                                    repo_id=self._repo_id,
-                                    repo_type='dataset',
-                                    revision=self._revision,
-                                    archive_in_repo=selected_item['archive_file'],
-                                    file_in_archive=selected_item['filename'],
-                                    local_file=tmp_image_file,
-                                )
-                                image = padding_align(tmp_image_file, (512, 768), color='#00000000')
-                                os.makedirs(os.path.dirname(dst_image_file), exist_ok=True)
-                                image.save(dst_image_file)
-
-                            row[f'Sample #{i}'] = f'![{label}-{i}]({hf_normpath(os.path.relpath(dst_image_file, td))})'
-                        else:
-                            row[f'Sample #{i}'] = 'N/A'
-                    samples.append(row)
-                df_samples = pd.DataFrame(samples)
-                print(df_samples.to_markdown(index=False), file=f)
-                print(f'', file=f)
+                create_readme(
+                    f=f,
+                    workdir=td,
+                    task_meta_info=self.meta_info,
+                    df_samples=df,
+                    fn_load_image=_load_image_by_id,
+                )
 
             operations = []
             for root, _, files in os.walk(td):
