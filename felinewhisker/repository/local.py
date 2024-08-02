@@ -2,8 +2,8 @@ import glob
 import json
 import logging
 import os.path
+import random
 import shutil
-import tarfile
 from typing import Optional, List, Union
 
 import numpy as np
@@ -11,10 +11,12 @@ import pandas as pd
 import yaml
 from hbutils.random import random_sha1_with_timestamp
 from hbutils.string import plural_word
-from hfutils.index import tar_get_index_info
+from hbutils.system import TemporaryDirectory
+from hfutils.index import tar_get_index_info, tar_file_download
 from hfutils.utils import hf_normpath, number_to_tag
 
 from .base import DatasetRepository
+from ..utils import padding_align
 
 
 class LocalRepository(DatasetRepository):
@@ -79,10 +81,6 @@ class LocalRepository(DatasetRepository):
         for file in files_to_drop:
             os.remove(file)
 
-        # def _extract_file(tar_file, filename):
-        #     with tarfile.open(tar_file, 'r') as tar:
-        #         tar.extra
-
         md_file = os.path.join(self._repo_dir, 'README.md')
         samples_dir = os.path.join(self._repo_dir, 'samples')
         os.makedirs(samples_dir, exist_ok=True)
@@ -95,16 +93,47 @@ class LocalRepository(DatasetRepository):
             print(f'---', file=f)
             print(f'', file=f)
 
-            print(f'Image Classification - {self.meta_info["name"]}', file=f)
+            print(f'# Image Classification - {self.meta_info["name"]}', file=f)
             print(f'', file=f)
             labels = self.meta_info['labels']
-            print(f'{plural_word(len(labels), "label")} in total, as the following:', file=f)
-            print(f'', file=f)
-            for label in labels:
-                print(f'* `{label}`', file=f)
+            print(f'{plural_word(len(labels), "label")}, {plural_word(len(df), "sample")} in total, '
+                  f'listed as the following:', file=f)
             print(f'', file=f)
 
-            print(f'This repository is empty and work in progress currently.', file=f)
+            sample_cnt = 8
+            samples = []
+            for label in labels:
+                df_label = df[df['annotation'] == label]
+                row = {
+                    'Label': label,
+                    'Samples': f'{len(df_label)} ({len(df_label) / len(df) * 100.0:.1f}%)',
+                }
+                ids = df_label['id'].tolist()
+                if len(ids) > sample_cnt:
+                    ids = random.sample(ids, k=sample_cnt)
+                selected = df_label[df_label['id'].isin(ids)].to_dict('records')
+                for i in range(sample_cnt):
+                    if i < len(selected):
+                        selected_item = selected[i]
+                        dst_image_file = os.path.join(samples_dir, label, f'{i}.webp')
+                        with TemporaryDirectory() as ttd:
+                            tmp_image_file = os.path.join(
+                                ttd, f'image{os.path.splitext(selected_item["filename"])[1]}')
+                            tar_file_download(
+                                archive_file=os.path.join(self._repo_dir, selected_item['archive_file']),
+                                file_in_archive=selected_item['filename'],
+                                local_file=tmp_image_file,
+                            )
+                            image = padding_align(tmp_image_file, (512, 768), color='white')
+                            os.makedirs(os.path.dirname(dst_image_file), exist_ok=True)
+                            image.save(dst_image_file)
+
+                        row[f'Sample #{i}'] = f'![{label}-{i}]({os.path.relpath(dst_image_file, self._repo_dir)})'
+                    else:
+                        row[f'Sample #{i}'] = 'N/A'
+                samples.append(row)
+            df_samples = pd.DataFrame(samples)
+            print(df_samples.to_markdown(index=False), file=f)
             print(f'', file=f)
 
     def __repr__(self):

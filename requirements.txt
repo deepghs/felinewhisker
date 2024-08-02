@@ -1,5 +1,5 @@
 hbutils>=0.10.0
-hfutils>=0.3.4
+hfutils>=0.3.5
 huggingface_hub
 tqdm
 requests
@@ -11,3 +11,4 @@ numpy<2
 pandas
 pyyaml>=6
 pyarrow
+tabulate
