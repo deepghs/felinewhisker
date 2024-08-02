@@ -1,74 +1,115 @@
 import os.path
+import shutil
 import tarfile
 import time
-import warnings
 from threading import Lock
-from typing import Union, Optional
+from typing import Optional, Callable
 
 import pandas as pd
-from hbutils.scale import size_to_bytes
-from hbutils.string import plural_word
+from hbutils.random import random_sha1_with_timestamp
 from hbutils.system import TemporaryDirectory
+from tqdm import tqdm
 
 from ..tasks import parse_annotation_checker_from_meta, AnnotationChecker
 
 
-class RepoWriter:
-    def __init__(self):
-        self._tmpdir = TemporaryDirectory()
-        self._tar_file = os.path.join(self._tmpdir.name, 'storage.tar')
-        self._data_file = os.path.join(self._tmpdir.name, 'data.parquet')
-        self._tar = tarfile.open(self._tar_file, mode='a:')
-        self._records = []
-        self._file_count = 0
-        self._file_total_size = 0
+class WriterSession:
+    def __init__(self, author: Optional[str], checker: AnnotationChecker,
+                 save_func: Callable[[str, str, str], None]):
+        self._author = author
+        self._checker = checker
+        self._token = random_sha1_with_timestamp()
+        if self._author:
+            self._token = f'{self._token}__{self._author}'
+        self._storage_tmpdir = TemporaryDirectory()
+        self._records = {}
+        self._save_func = save_func
+        self._lock = Lock()
 
-    @property
-    def file_count(self) -> int:
-        return self._file_count
+    def add(self, id_: str, image_file: str, annotation):
+        with self._lock:
+            if annotation is not None:
+                self._checker.check(annotation)
+            _, ext = os.path.splitext(os.path.basename(image_file))
+            filename = f'{id_}{ext}'
+            shutil.copyfile(image_file, os.path.join(self._storage_tmpdir.name, filename))
+            self._records[id_] = {
+                'id': id_,
+                'filename': filename,
+                'annotation': annotation,
+                'updated_at': time.time(),
+                'author': self._author,
+            }
 
-    @property
-    def file_total_size(self) -> int:
-        return self._file_total_size
+    def __getitem__(self, item):
+        with self._lock:
+            return self._records[item]['annotation']
 
-    def add_file(self, id_: Union[str, int], image_file: str, annotation, author: Optional[str] = None):
-        _, ext = os.path.splitext(os.path.basename(image_file))
-        filename = f'{id_}{ext}'
-        self._tar.add(image_file, filename)
-        self._records.append({
-            'id': id_,
-            'filename': filename,
-            'annotation': annotation,
-            'created_at': time.time(),
-            'author': author,
-        })
-        self._file_count += 1
-        self._file_total_size += os.path.getsize(image_file)
+    def __setitem__(self, key, value):
+        with self._lock:
+            if value is not None:
+                self._checker.check(value)
+            self._records[key]['annotation'] = value
+            self._records[key]['updated_at'] = time.time()
 
-    def flush(self):
-        df = pd.DataFrame(self._records)
-        df.to_parquet(self._data_file, engine='pyarrow', index=False)
-        self._tar.close()
-        self._tar = tarfile.open(self._tar_file, mode='a:')
-        return self._tar_file, self._data_file
+    def __delitem__(self, key):
+        with self._lock:
+            filename = self._records[key]['filename']
+            del self._records[key]
+            os.remove(os.path.join(self._storage_tmpdir.name, filename))
+
+    def __len__(self):
+        with self._lock:
+            return len(self._records)
+
+    def _save(self):
+        with TemporaryDirectory() as td:
+            records = []
+            tar_file = os.path.join(td, 'data.tar')
+            with tarfile.open(tar_file, 'a:') as tar:
+                keys = sorted(self._records.keys())
+                for key in tqdm(keys, desc='Packing'):
+                    item = self._records[key]
+                    filename = item['filename']
+                    if item['annotation'] is not None:
+                        tar.add(os.path.join(self._storage_tmpdir.name, filename), filename)
+                        records.append(item)
+
+            data_file = os.path.join(td, 'data.parquet')
+            df = pd.DataFrame(records)
+            df.to_parquet(data_file, engine='pyarrow', index=False)
+            self._save_func(tar_file, data_file, self._token)
+
+    def save(self):
+        with self._lock:
+            self._save()
+
+    def _close(self):
+        self._storage_tmpdir.cleanup()
 
     def close(self):
-        self._tmpdir.cleanup()
+        with self._lock:
+            self._close()
+
+    def __del__(self):
+        self._close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._save()
+        self._close()
 
 
 class DatasetRepository:
-    def __init__(self, flush_files: Optional[int] = None, flush_size: Optional[Union[int, str]] = None):
-        self._flush_files = flush_files
-        self._flush_size = flush_size
-        if self._flush_size:
-            self._flush_size = int(size_to_bytes(self._flush_size))
-        self._writer: Optional[RepoWriter] = None
-        self.meta_info, self._exist_ids = None, None
+    def __init__(self):
+        self.meta_info = None
         self._annotation_checker: Optional[AnnotationChecker] = None
         self._lock = Lock()
         self._sync()
 
-    def _write(self, tar_file, data_file):
+    def _write(self, tar_file: str, data_file: str, token: str):
         raise NotImplementedError  # pragma: no cover
 
     def _read(self):
@@ -78,10 +119,7 @@ class DatasetRepository:
         raise NotImplementedError  # pragma: no cover
 
     def _sync(self):
-        if self._writer and self._writer.file_count > 0:
-            warnings.warn(f'Unsaved {plural_word(self._writer.file_count, "image")} will be dropped when syncing.')
-        self._writer = None
-        self.meta_info, self._exist_ids = self._read()
+        self.meta_info = self._read()
         self._annotation_checker = parse_annotation_checker_from_meta(self.meta_info)
 
     def squash(self):
@@ -94,29 +132,10 @@ class DatasetRepository:
         with self._lock:
             self._sync()
 
-    def add_file(self, id_: Union[str, int], image_file: str, annotation, author: Optional[str] = None):
+    def write(self, author: Optional[str] = None):
         with self._lock:
-            if id_ in self._exist_ids:
-                warnings.warn(f'Id already exist in {self}, skipped.')
-                return
-            if self._annotation_checker:  # check the annotation
-                self._annotation_checker.check(annotation)
-
-            if self._writer is None:
-                self._writer = RepoWriter()
-            self._writer.add_file(id_=id_, image_file=image_file, annotation=annotation, author=author)
-            self._exist_ids.add(id_)
-            if (self._flush_files is not None and self._writer.file_count >= self._flush_files) or \
-                    (self._flush_size is not None and self._writer.file_total_size >= self._flush_size):
-                self._flush()
-
-    def _flush(self):
-        if self._writer is not None:
-            tar_file, data_file = self._writer.flush()
-            self._write(tar_file=tar_file, data_file=data_file)
-            self._writer.close()
-            self._writer = None
-
-    def flush(self):
-        with self._lock:
-            self._flush()
+            return WriterSession(
+                author=author,
+                checker=self._annotation_checker,
+                save_func=self._write,
+            )

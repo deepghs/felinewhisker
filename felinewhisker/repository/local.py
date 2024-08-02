@@ -1,15 +1,13 @@
 import glob
 import json
-import logging
 import os.path
 import random
 import shutil
-from typing import Optional, List, Union
+from typing import Optional, List
 
 import numpy as np
 import pandas as pd
 import yaml
-from hbutils.random import random_sha1_with_timestamp
 from hbutils.string import plural_word
 from hbutils.system import TemporaryDirectory
 from hfutils.index import tar_get_index_info, tar_file_download
@@ -20,15 +18,13 @@ from ..utils import padding_align
 
 
 class LocalRepository(DatasetRepository):
-    def __init__(self, repo_dir: str, flush_files: Optional[int] = None,
-                 flush_size: Optional[Union[int, str]] = '2GB'):
+    def __init__(self, repo_dir: str):
         self._repo_dir = repo_dir
         self._meta_info_file = os.path.join(self._repo_dir, 'meta.json')
         self._data_file = os.path.join(self._repo_dir, 'data.parquet')
-        DatasetRepository.__init__(self, flush_files=flush_files, flush_size=flush_size)
+        DatasetRepository.__init__(self)
 
-    def _write(self, tar_file, data_file):
-        token = random_sha1_with_timestamp()
+    def _write(self, tar_file: str, data_file: str, token: str):
         date_str = token[:8]
         dst_tar_file = os.path.join(self._repo_dir, 'images', date_str, f'{token}.tar')
         dst_idx_file = os.path.join(self._repo_dir, 'images', date_str, f'{token}.json')
@@ -50,33 +46,23 @@ class LocalRepository(DatasetRepository):
     def _read(self):
         with open(self._meta_info_file, 'r') as f:
             meta_info = json.load(f)
-        if os.path.exists(self._data_file):
-            df = pd.read_parquet(self._data_file)
-            exist_ids = set(df['id'])
-        else:
-            exist_ids = set()
-        return meta_info, exist_ids
+        return meta_info
 
     def _squash(self):
         data_file = os.path.join(self._repo_dir, 'data.parquet')
         if os.path.exists(data_file):
             df = pd.read_parquet(data_file)
-            records = df.to_dict('records')
-            exist_ids = set(df['id'])
+            records = {item['id']: item for item in df.to_dict('records')}
         else:
-            records = []
-            exist_ids = set()
+            records = {}
 
         files_to_drop = []
         for file in glob.glob(os.path.join(self._repo_dir, 'unarchived', '*.parquet')):
             for item in pd.read_parquet(file).to_dict('records'):
-                if item['id'] not in exist_ids:
-                    records.append(item)
-                else:
-                    logging.warning(f'Item {item["id"]!r} duplicated, so dropped.')
+                records[item['id']] = item
             files_to_drop.append(file)
-        df = pd.DataFrame(records)
-        df = df.sort_values(by=['created_at', 'id'], ascending=[False, True])
+        df = pd.DataFrame(list(records.values()))
+        df = df.sort_values(by=['updated_at', 'id'], ascending=[False, True])
         df.to_parquet(data_file, engine='pyarrow', index=False)
         for file in files_to_drop:
             os.remove(file)
@@ -124,7 +110,7 @@ class LocalRepository(DatasetRepository):
                                 file_in_archive=selected_item['filename'],
                                 local_file=tmp_image_file,
                             )
-                            image = padding_align(tmp_image_file, (512, 768), color='white')
+                            image = padding_align(tmp_image_file, (512, 768), color='#00000000')
                             os.makedirs(os.path.dirname(dst_image_file), exist_ok=True)
                             image.save(dst_image_file)
 
@@ -140,9 +126,8 @@ class LocalRepository(DatasetRepository):
         return f'<{self.__class__.__name__} dir: {self._repo_dir!r}>'
 
     @classmethod
-    def init_classification(
-            cls, local_dir: str, task_name: str, labels: List[str], readme_metadata: Optional[dict] = None,
-            flush_files: Optional[int] = None, flush_size: Optional[int] = '2GB') -> 'LocalRepository':
+    def init_classification(cls, local_dir: str, task_name: str, labels: List[str],
+                            readme_metadata: Optional[dict] = None) -> 'LocalRepository':
         os.makedirs(local_dir, exist_ok=True)
         readme_metadata = dict(readme_metadata or {})
 
@@ -175,4 +160,4 @@ class LocalRepository(DatasetRepository):
             print(f'This repository is empty and work in progress currently.', file=f)
             print(f'', file=f)
 
-        return LocalRepository(local_dir, flush_size=flush_size, flush_files=flush_files)
+        return LocalRepository(local_dir)

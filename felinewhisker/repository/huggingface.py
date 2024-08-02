@@ -1,34 +1,31 @@
 import json
-import logging
 import os
 import random
 import shutil
-from typing import Optional, Union, List
+from typing import Optional, List
 
 import numpy as np
 import pandas as pd
 import yaml
-from hbutils.random import random_sha1_with_timestamp
 from hbutils.string import plural_word
 from hbutils.system import TemporaryDirectory
 from hfutils.index import tar_get_index_info, hf_tar_file_download
 from hfutils.operate import upload_directory_as_directory, get_hf_fs, get_hf_client
 from hfutils.utils import hf_normpath, hf_fs_path, parse_hf_fs_path, number_to_tag
 from huggingface_hub import CommitOperationAdd, CommitOperationDelete
+from natsort import natsorted
 
 from .base import DatasetRepository
 from ..utils import padding_align
 
 
 class HfOnlineRepository(DatasetRepository):
-    def __init__(self, repo_id: str, revision: str = 'main', flush_files: Optional[int] = None,
-                 flush_size: Optional[Union[int, str]] = '2GB'):
+    def __init__(self, repo_id: str, revision: str = 'main'):
         self._repo_id = repo_id
         self._revision = revision
-        DatasetRepository.__init__(self, flush_files=flush_files, flush_size=flush_size)
+        DatasetRepository.__init__(self)
 
-    def _write(self, tar_file, data_file):
-        token = random_sha1_with_timestamp()
+    def _write(self, tar_file: str, data_file: str, token: str):
         date_str = token[:8]
         with TemporaryDirectory() as td:
             dst_tar_file = os.path.join(td, 'images', date_str, f'{token}.tar')
@@ -52,9 +49,9 @@ class HfOnlineRepository(DatasetRepository):
             pack_name = os.path.basename(dst_tar_file)
             if named_authors:
                 commit_message = f'Add package with {plural_word(len(df), "sample")} contributed ' \
-                                 f'by {", ".join(map(lambda x: f"@{x}", named_authors))} - {pack_name}.'
+                                 f'by {", ".join(map(lambda x: f"@{x}", named_authors))} - {pack_name}'
             else:
-                commit_message = f'Add package with {plural_word(len(df), "sample")} - {pack_name}.'
+                commit_message = f'Add package with {plural_word(len(df), "sample")} - {pack_name}'
             upload_directory_as_directory(
                 repo_id=self._repo_id,
                 repo_type='dataset',
@@ -74,22 +71,7 @@ class HfOnlineRepository(DatasetRepository):
             revision=self._revision,
             filename='meta.json',
         )))
-        if hf_fs.exists(hf_fs_path(
-                repo_id=self._repo_id,
-                repo_type='dataset',
-                revision=self._revision,
-                filename='data.parquet',
-        )):
-            df = pd.read_parquet(hf_client.hf_hub_download(
-                repo_id=self._repo_id,
-                repo_type='dataset',
-                revision=self._revision,
-                filename='data.parquet',
-            ))
-            exist_ids = set(df['id'])
-        else:
-            exist_ids = set()
-        return meta_info, exist_ids
+        return meta_info
 
     def _squash(self):
         hf_fs = get_hf_fs(hf_token=os.environ.get('HF_TOKEN'))
@@ -107,19 +89,17 @@ class HfOnlineRepository(DatasetRepository):
                 revision=self._revision,
                 filename='data.parquet',
             ))
-            records = df.to_dict('records')
-            exist_ids = set(df['id'])
+            records = {item['id']: item for item in df.to_dict('records')}
         else:
-            records = []
-            exist_ids = set()
+            records = {}
 
         files_to_drop = []
-        for filepath in hf_fs.glob(hf_fs_path(
+        for filepath in natsorted(hf_fs.glob(hf_fs_path(
                 repo_id=self._repo_id,
                 repo_type='dataset',
                 revision=self._revision,
                 filename='unarchived/*.parquet',
-        )):
+        ))):
             filename = parse_hf_fs_path(filepath).filename
             for item in pd.read_parquet(hf_client.hf_hub_download(
                     repo_id=self._repo_id,
@@ -127,15 +107,12 @@ class HfOnlineRepository(DatasetRepository):
                     revision=self._revision,
                     filename=filename,
             )).to_dict('records'):
-                if item['id'] not in exist_ids:
-                    records.append(item)
-                else:
-                    logging.warning(f'Item {item["id"]!r} duplicated, so dropped.')
+                records[item['id']] = item
             files_to_drop.append(filename)
 
         with TemporaryDirectory() as td:
-            df = pd.DataFrame(records)
-            df = df.sort_values(by=['created_at', 'id'], ascending=[False, True])
+            df = pd.DataFrame(list(records.values()))
+            df = df.sort_values(by=['updated_at', 'id'], ascending=[False, True])
             df.to_parquet(os.path.join(td, 'data.parquet'), engine='pyarrow', index=False)
 
             md_file = os.path.join(td, 'README.md')
@@ -184,7 +161,7 @@ class HfOnlineRepository(DatasetRepository):
                                     file_in_archive=selected_item['filename'],
                                     local_file=tmp_image_file,
                                 )
-                                image = padding_align(tmp_image_file, (512, 768), color='white')
+                                image = padding_align(tmp_image_file, (512, 768), color='#00000000')
                                 os.makedirs(os.path.dirname(dst_image_file), exist_ok=True)
                                 image.save(dst_image_file)
 
@@ -212,16 +189,16 @@ class HfOnlineRepository(DatasetRepository):
                 repo_type='dataset',
                 revision=self._revision,
                 operations=operations,
-                commit_message=f'Squash {plural_word(len(operations), "package")}'
+                commit_message=f'Squash {plural_word(len(files_to_drop), "package")}, '
+                               f'now this dataset contains {plural_word(len(df), "sample")}'
             )
 
     def __repr__(self):
         return f'<{self.__class__.__name__} repo_id: {self._repo_id!r}, revision: {self._revision!r}>'
 
     @classmethod
-    def init_classification(
-            cls, repo_id: str, task_name: str, labels: List[str], readme_metadata: Optional[dict] = None,
-            flush_files: Optional[int] = None, flush_size: Optional[int] = '2GB') -> 'HfOnlineRepository':
+    def init_classification(cls, repo_id: str, task_name: str, labels: List[str],
+                            readme_metadata: Optional[dict] = None) -> 'HfOnlineRepository':
         hf_client = get_hf_client(hf_token=os.environ.get('HF_TOKEN'))
 
         from .local import LocalRepository
@@ -231,8 +208,6 @@ class HfOnlineRepository(DatasetRepository):
                 task_name=task_name,
                 labels=labels,
                 readme_metadata=readme_metadata,
-                flush_files=flush_files,
-                flush_size=flush_size,
             )
 
             if not hf_client.repo_exists(repo_id=repo_id, repo_type='dataset'):
@@ -243,12 +218,8 @@ class HfOnlineRepository(DatasetRepository):
                 repo_type='dataset',
                 local_directory=td,
                 path_in_repo='.',
-                message=f'Initialize classification task - {task_name!r}.',
+                message=f'Initialize classification task - {task_name!r}',
                 clear=True,
             )
 
-        return HfOnlineRepository(
-            repo_id=repo_id,
-            flush_files=flush_files,
-            flush_size=flush_size,
-        )
+        return HfOnlineRepository(repo_id=repo_id)
