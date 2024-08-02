@@ -164,7 +164,7 @@ class LocalRepository(DatasetRepository):
             print(f'---', file=f)
             print(f'', file=f)
 
-            print(f'Image Classification - {task_name}', file=f)
+            print(f'# Image Classification - {task_name}', file=f)
             print(f'', file=f)
             print(f'{plural_word(len(labels), "label")} in total, as the following:', file=f)
             print(f'', file=f)
