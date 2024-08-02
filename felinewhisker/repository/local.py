@@ -6,15 +6,13 @@ from typing import Optional, List
 
 import numpy as np
 import pandas as pd
-import yaml
 from PIL import Image
-from hbutils.string import plural_word
 from hbutils.system import TemporaryDirectory
 from hfutils.index import tar_get_index_info, tar_file_download
-from hfutils.utils import hf_normpath, number_to_tag
+from hfutils.utils import hf_normpath
 
 from .base import DatasetRepository
-from ..tasks import create_readme
+from ..tasks import create_readme, init_project
 
 
 class LocalRepository(DatasetRepository):
@@ -100,34 +98,12 @@ class LocalRepository(DatasetRepository):
                             readme_metadata: Optional[dict] = None) -> 'LocalRepository':
         os.makedirs(local_dir, exist_ok=True)
         readme_metadata = dict(readme_metadata or {})
-
-        meta_file = os.path.join(local_dir, 'meta.json')
-        with open(meta_file, 'w') as f:
-            json.dump({
-                'name': task_name,
-                'labels': labels,
-                'readme_metadata': readme_metadata,
-                'task': 'classification',
-            }, f, indent=4, sort_keys=True, ensure_ascii=False),
-
-        md_file = os.path.join(local_dir, 'README.md')
-        with open(md_file, 'w') as f:
-            readme_metadata['task_categories'] = ['image-classification']
-            readme_metadata['size_categories'] = [number_to_tag(0)]
-            print(f'---', file=f)
-            yaml.dump(readme_metadata, f, default_flow_style=False, sort_keys=False)
-            print(f'---', file=f)
-            print(f'', file=f)
-
-            print(f'# Image Classification - {task_name}', file=f)
-            print(f'', file=f)
-            print(f'{plural_word(len(labels), "label")} in total, as the following:', file=f)
-            print(f'', file=f)
-            for label in labels:
-                print(f'* `{label}`', file=f)
-            print(f'', file=f)
-
-            print(f'This repository is empty and work in progress currently.', file=f)
-            print(f'', file=f)
+        init_project(
+            task_type='classification',
+            workdir=local_dir,
+            task_name=task_name,
+            readme_metadata=readme_metadata,
+            labels=labels,
+        )
 
         return LocalRepository(local_dir)

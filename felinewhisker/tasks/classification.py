@@ -1,3 +1,4 @@
+import json
 import os
 import random
 from typing import List, Callable
@@ -79,3 +80,34 @@ def create_readme_for_classification(f, workdir: str, task_meta_info: dict, df_s
     df_samples = pd.DataFrame(samples)
     print(df_samples.to_markdown(index=False), file=f)
     print(f'', file=f)
+
+
+def init_project_for_classification(workdir: str, task_name: str, readme_metadata: dict, labels: List[str]):
+    meta_file = os.path.join(workdir, 'meta.json')
+    with open(meta_file, 'w') as f:
+        json.dump({
+            'name': task_name,
+            'labels': labels,
+            'readme_metadata': readme_metadata,
+            'task': 'classification',
+        }, f, indent=4, sort_keys=True, ensure_ascii=False)
+
+    md_file = os.path.join(workdir, 'README.md')
+    with open(md_file, 'w') as f:
+        readme_metadata['task_categories'] = ['image-classification']
+        readme_metadata['size_categories'] = [number_to_tag(0)]
+        print(f'---', file=f)
+        yaml.dump(readme_metadata, f, default_flow_style=False, sort_keys=False)
+        print(f'---', file=f)
+        print(f'', file=f)
+
+        print(f'# Image Classification - {task_name}', file=f)
+        print(f'', file=f)
+        print(f'{plural_word(len(labels), "label")} in total, as the following:', file=f)
+        print(f'', file=f)
+        for label in labels:
+            print(f'* `{label}`', file=f)
+        print(f'', file=f)
+
+        print(f'This repository is empty and work in progress currently.', file=f)
+        print(f'', file=f)

@@ -15,7 +15,7 @@ from huggingface_hub import CommitOperationAdd, CommitOperationDelete
 from natsort import natsorted
 
 from .base import DatasetRepository
-from ..tasks import create_readme
+from ..tasks import create_readme, init_project
 
 
 class HfOnlineRepository(DatasetRepository):
@@ -168,14 +168,15 @@ class HfOnlineRepository(DatasetRepository):
     def init_classification(cls, repo_id: str, task_name: str, labels: List[str],
                             readme_metadata: Optional[dict] = None) -> 'HfOnlineRepository':
         hf_client = get_hf_client(hf_token=os.environ.get('HF_TOKEN'))
+        readme_metadata = dict(readme_metadata or {})
 
-        from .local import LocalRepository
         with TemporaryDirectory() as td:
-            LocalRepository.init_classification(
-                local_dir=td,
+            init_project(
+                task_type='classification',
+                workdir=td,
                 task_name=task_name,
-                labels=labels,
                 readme_metadata=readme_metadata,
+                labels=labels,
             )
 
             if not hf_client.repo_exists(repo_id=repo_id, repo_type='dataset'):
