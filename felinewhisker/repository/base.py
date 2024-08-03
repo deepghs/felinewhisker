@@ -15,7 +15,7 @@ from ..tasks import parse_annotation_checker_from_meta, AnnotationChecker
 
 class WriterSession:
     def __init__(self, author: Optional[str], checker: AnnotationChecker,
-                 save_func: Callable[[str, str, str], None]):
+                 fn_save: Callable[[str, str, str], None], fn_contains_id: Callable[[str], bool]):
         self._author = author
         self._checker = checker
         self._token = random_sha1_with_timestamp()
@@ -23,8 +23,13 @@ class WriterSession:
             self._token = f'{self._token}__{self._author}'
         self._storage_tmpdir = TemporaryDirectory()
         self._records = {}
-        self._save_func = save_func
+        self._fn_save = fn_save
+        self._fn_contains_id = fn_contains_id
         self._lock = Lock()
+
+    def is_id_duplicated(self, id_: str) -> bool:
+        with self._lock:
+            return id_ in self._records or self._fn_contains_id(id_)
 
     def add(self, id_: str, image_file: str, annotation):
         with self._lock:
@@ -62,6 +67,10 @@ class WriterSession:
         with self._lock:
             return len(self._records)
 
+    def __contains__(self, item):
+        with self._lock:
+            return item in self._records
+
     def _save(self):
         with TemporaryDirectory() as td:
             records = []
@@ -78,7 +87,7 @@ class WriterSession:
             data_file = os.path.join(td, 'data.parquet')
             df = pd.DataFrame(records)
             df.to_parquet(data_file, engine='pyarrow', index=False)
-            self._save_func(tar_file, data_file, self._token)
+            self._fn_save(tar_file, data_file, self._token)
 
     def save(self):
         with self._lock:
@@ -105,6 +114,7 @@ class WriterSession:
 class DatasetRepository:
     def __init__(self):
         self.meta_info = None
+        self._exist_ids = None
         self._annotation_checker: Optional[AnnotationChecker] = None
         self._lock = Lock()
         self._sync()
@@ -119,7 +129,7 @@ class DatasetRepository:
         raise NotImplementedError  # pragma: no cover
 
     def _sync(self):
-        self.meta_info = self._read()
+        self.meta_info, self._exist_ids = self._read()
         self._annotation_checker = parse_annotation_checker_from_meta(self.meta_info)
 
     def squash(self):
@@ -137,5 +147,10 @@ class DatasetRepository:
             return WriterSession(
                 author=author,
                 checker=self._annotation_checker,
-                save_func=self._write,
+                fn_save=self._write,
+                fn_contains_id=lambda id_: id_ in self._exist_ids,
             )
+
+    def contains_id(self, id_: str):
+        with self._lock:
+            return id_ in self._exist_ids

@@ -3,7 +3,7 @@ import pathlib
 from contextlib import contextmanager
 from dataclasses import dataclass
 from os import PathLike
-from typing import Union, Any, Optional, ContextManager, Iterator
+from typing import Union, Any, Optional, ContextManager, Iterator, Callable
 
 from PIL import Image
 from hbutils.random import random_sha1_with_timestamp
@@ -13,7 +13,7 @@ from imgutils.data import load_image, grid_transparent
 
 @dataclass
 class ImageItem:
-    id: Optional[Union[int, str]]
+    id: str
     image: Union[str, PathLike, Image.Image]
     annotation: Optional[Any]
 
@@ -56,11 +56,12 @@ class ImageItem:
 
 
 class BaseDataSource:
-    def __init__(self):
+    def __init__(self, fn_contains_id: Optional[Callable[[str], bool]] = None):
         self._status = 'idle'
+        self._fn_contains_id = fn_contains_id or (lambda x: False)
 
     def _iter(self):
-        raise NotImplementedError
+        raise NotImplementedError  # pragma: no cover
 
     def _init(self):
         pass
@@ -109,4 +110,5 @@ class BaseDataSource:
                 annotate = None
 
             id_ = id_ or random_sha1_with_timestamp()
-            yield ImageItem(id_, v, annotate)
+            if not self._fn_contains_id(id_):
+                yield ImageItem(id_, v, annotate)

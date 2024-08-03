@@ -1,5 +1,6 @@
 import glob
 import json
+import logging
 import os.path
 import shutil
 from typing import Optional, List
@@ -44,7 +45,11 @@ class LocalRepository(DatasetRepository):
     def _read(self):
         with open(self._meta_info_file, 'r') as f:
             meta_info = json.load(f)
-        return meta_info
+        if os.path.exists(self._data_file):
+            exist_ids = set(pd.read_parquet(self._data_file)['id'])
+        else:
+            exist_ids = set()
+        return meta_info, exist_ids
 
     def _squash(self):
         data_file = os.path.join(self._repo_dir, 'data.parquet')
@@ -60,6 +65,8 @@ class LocalRepository(DatasetRepository):
                 records[item['id']] = item
             files_to_drop.append(file)
         df = pd.DataFrame(list(records.values()))
+        if len(df) == 0:
+            logging.warning('No samples in total, squash operation cancelled.')
         df = df.sort_values(by=['updated_at', 'id'], ascending=[False, True])
         df.to_parquet(data_file, engine='pyarrow', index=False)
         for file in files_to_drop:

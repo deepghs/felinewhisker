@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import shutil
 from typing import Optional, List
@@ -8,6 +9,7 @@ import pandas as pd
 from PIL import Image
 from hbutils.string import plural_word
 from hbutils.system import TemporaryDirectory
+from hfutils.cache import delete_detached_cache
 from hfutils.index import tar_get_index_info, hf_tar_file_download
 from hfutils.operate import upload_directory_as_directory, get_hf_fs, get_hf_client
 from hfutils.utils import hf_normpath, hf_fs_path, parse_hf_fs_path
@@ -44,7 +46,10 @@ class HfOnlineRepository(DatasetRepository):
             df = pd.DataFrame(records)
             df.to_parquet(dst_data_file, engine='pyarrow', index=False)
 
-            named_authors = set(filter(bool, df['author'].tolist()))
+            if len(df) > 0:
+                named_authors = set(filter(bool, df['author'].tolist()))
+            else:
+                named_authors = []
             pack_name = os.path.basename(dst_tar_file)
             if named_authors:
                 commit_message = f'Add package with {plural_word(len(df), "sample")} contributed ' \
@@ -61,7 +66,9 @@ class HfOnlineRepository(DatasetRepository):
             )
 
     def _read(self):
+        delete_detached_cache(repo_id=self._repo_id, repo_type='dataset')
         hf_fs = get_hf_fs(hf_token=os.environ.get('HF_TOKEN'))
+        hf_client = get_hf_client(hf_token=os.environ['HF_TOKEN'])
 
         meta_info = json.loads(hf_fs.read_text(hf_fs_path(
             repo_id=self._repo_id,
@@ -69,9 +76,26 @@ class HfOnlineRepository(DatasetRepository):
             revision=self._revision,
             filename='meta.json',
         )))
-        return meta_info
+        if hf_fs.exists(hf_fs_path(
+                repo_id=self._repo_id,
+                repo_type='dataset',
+                revision=self._revision,
+                filename='data.parquet'
+        )):
+            df = pd.read_parquet(hf_client.hf_hub_download(
+                repo_id=self._repo_id,
+                repo_type='dataset',
+                revision=self._revision,
+                filename='data.parquet'
+            ))
+            exist_ids = set(df['id'])
+        else:
+            exist_ids = set()
+
+        return meta_info, exist_ids
 
     def _squash(self):
+        delete_detached_cache(repo_id=self._repo_id, repo_type='dataset')
         hf_fs = get_hf_fs(hf_token=os.environ.get('HF_TOKEN'))
         hf_client = get_hf_client(hf_token=os.environ.get('HF_TOKEN'))
 
@@ -128,6 +152,9 @@ class HfOnlineRepository(DatasetRepository):
 
         with TemporaryDirectory() as td:
             df = pd.DataFrame(list(records.values()))
+            if len(df) == 0:
+                logging.warning('No samples in total, squash operation cancelled.')
+                return
             df = df.sort_values(by=['updated_at', 'id'], ascending=[False, True])
             df.to_parquet(os.path.join(td, 'data.parquet'), engine='pyarrow', index=False)
 
