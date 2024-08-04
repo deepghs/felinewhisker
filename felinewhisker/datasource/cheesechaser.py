@@ -1,4 +1,4 @@
-from typing import Optional, Callable, Union, Iterator
+from typing import Optional, Callable, Union, Iterable
 
 from cheesechaser.datapool import DataPool
 from cheesechaser.pipe import Pipe, SimpleImagePipe, PipeItem
@@ -8,7 +8,7 @@ from .base import BaseDataSource
 
 
 class CheeseChaserDataSource(BaseDataSource):
-    def __init__(self, source: Union[DataPool, Pipe], id_generator: Iterator[Union[str, int]],
+    def __init__(self, source: Union[DataPool, Pipe], id_generator: Iterable[Union[str, int]],
                  source_id: Optional[str] = None, fn_contains_id: Optional[Callable[[str], bool]] = None):
         if isinstance(source, DataPool):
             self._pipe = SimpleImagePipe(source)

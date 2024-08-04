@@ -12,4 +12,4 @@ pandas
 pyyaml>=6
 pyarrow
 tabulate
-git+https://github.com/deepghs/cheesechaser.git
+cheesechaser>=0.0.1
