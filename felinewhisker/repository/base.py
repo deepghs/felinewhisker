@@ -46,21 +46,25 @@ class WriterSession:
                 'author': self._author,
             }
 
-    def __getitem__(self, item):
+    def get_image_path(self, id_: str):
         with self._lock:
-            return self._records[item]['annotation']
+            return os.path.join(self._storage_tmpdir.name, self._records[id_]['filename'])
 
-    def __setitem__(self, key, value):
+    def __getitem__(self, id_):
         with self._lock:
-            if value is not None:
-                self._checker.check(value)
-            self._records[key]['annotation'] = value
-            self._records[key]['updated_at'] = time.time()
+            return self._records[id_]['annotation']
 
-    def __delitem__(self, key):
+    def __setitem__(self, id_, annotation):
         with self._lock:
-            filename = self._records[key]['filename']
-            del self._records[key]
+            if annotation is not None:
+                self._checker.check(annotation)
+            self._records[id_]['annotation'] = annotation
+            self._records[id_]['updated_at'] = time.time()
+
+    def __delitem__(self, id_):
+        with self._lock:
+            filename = self._records[id_]['filename']
+            del self._records[id_]
             os.remove(os.path.join(self._storage_tmpdir.name, filename))
 
     def __len__(self):

@@ -9,29 +9,7 @@ from PIL import Image
 from hbutils.string import plural_word
 from hfutils.utils import number_to_tag, hf_normpath
 
-from .base import AnnotationChecker
-from ..utils import padding_align
-
-
-class ClassificationAnnotationChecker(AnnotationChecker):
-    __task__ = 'classification'
-
-    def __init__(self, labels: List[str]):
-        self._labels = list(labels)
-        self._label_set = set(labels)
-
-    def check(self, annotation):
-        if isinstance(annotation, str) and annotation in self._label_set:
-            pass
-        else:
-            raise ValueError(f'Invalid annotation {annotation!r} for {self}.')
-
-    def __repr__(self):
-        return f'<{self.__class__.__name__} labels: {self._labels}>'
-
-    @classmethod
-    def parse_from_meta(cls, meta_info: dict) -> 'ClassificationAnnotationChecker':
-        return cls(labels=meta_info['labels'])
+from ...utils import padding_align
 
 
 def create_readme_for_classification(f, workdir: str, task_meta_info: dict, df_samples: pd.DataFrame,
