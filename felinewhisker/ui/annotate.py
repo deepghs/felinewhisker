@@ -1,3 +1,5 @@
+import json
+import os.path
 import pathlib
 from typing import Iterable, Callable, Optional, Any
 
@@ -13,14 +15,49 @@ _HOTKEY_JS_CODE = (pathlib.Path(__file__).parent / 'hotkeys.js').read_text()
 
 
 def create_annotation_tab(repo: DatasetRepository, demo: gr.Blocks,
-                          datasource: Iterable[ImageItem], write_session: WriterSession,
-                          fn_annotate_assist: Optional[Callable[[str], Any]] = None, **kwargs):
+                          datasource: Iterable[ImageItem], write_session: WriterSession, state_file: str,
+                          fn_annotate_assist: Optional[Callable[[str], Any]] = None,
+                          **kwargs):
     data_iterator = iter(datasource)
 
     gr_state_output = gr.State(value=None)
     gr_position_id = gr.State(value=-1)
-    gr_datasource_length = gr.State(value=None)
+    gr_max_length = gr.State(value=None)
     gr_id_list = gr.State(value=[])
+
+    def _fn_state_save(position_id, max_length, id_list):
+        with open(state_file, 'w') as f:
+            json.dump({
+                'position_id': position_id,
+                'max_length': max_length,
+                'id_list': id_list,
+            }, f, indent=4, sort_keys=True)
+
+    gr_position_id.change(
+        fn=_fn_state_save,
+        inputs=[gr_position_id, gr_max_length, gr_id_list],
+    )
+    gr_max_length.change(
+        fn=_fn_state_save,
+        inputs=[gr_position_id, gr_max_length, gr_id_list],
+    )
+    gr_id_list.change(
+        fn=_fn_state_save,
+        inputs=[gr_position_id, gr_max_length, gr_id_list],
+    )
+
+    def _fn_load_state():
+        if os.path.exists(state_file):
+            with open(state_file, 'r') as f:
+                state = json.load(f)
+                return state['position_id'], state['max_length'], state['id_list']
+        else:
+            return -1, None, []
+
+    demo.load(
+        fn=_fn_load_state,
+        outputs=[gr_position_id, gr_max_length, gr_id_list],
+    )
 
     with gr.Row():
         gr_state_input = create_ui_for_annotator(
@@ -87,8 +124,8 @@ def create_annotation_tab(repo: DatasetRepository, demo: gr.Blocks,
 
     gr_next.click(
         fn=_fn_next,
-        inputs=[gr_position_id, gr_id_list, gr_datasource_length],
-        outputs=[gr_position_id, gr_id_list, gr_datasource_length],
+        inputs=[gr_position_id, gr_id_list, gr_max_length],
+        outputs=[gr_position_id, gr_id_list, gr_max_length],
     )
 
     def _ch_change(state):
@@ -121,7 +158,7 @@ def create_annotation_tab(repo: DatasetRepository, demo: gr.Blocks,
 
     gr_position_id.change(
         fn=_fn_index_change,
-        inputs=[gr_position_id, gr_id_list, gr_datasource_length],
+        inputs=[gr_position_id, gr_id_list, gr_max_length],
         outputs=[gr_state_input, gr_prev, gr_next, gr_save],
     )
 
