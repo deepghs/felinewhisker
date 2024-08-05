@@ -94,7 +94,6 @@ def create_annotation_tab(repo: DatasetRepository, demo: gr.Blocks,
     def _ch_change(state):
         id_, annotation = state
         write_session[id_] = annotation
-        print(f'{id_} --> {state!r}')
 
     gr_state_output.change(
         fn=_ch_change,
@@ -107,6 +106,7 @@ def create_annotation_tab(repo: DatasetRepository, demo: gr.Blocks,
         image_file = write_session.get_image_path(sample_id)
 
         if fn_annotate_assist and annotation is None:
+            gr.Info(f'Annotating sample #{idx} by assistant ...')
             annotation = fn_annotate_assist(image_file)
             if annotation is not None:
                 write_session[sample_id] = annotation
