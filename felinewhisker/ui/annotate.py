@@ -14,10 +14,11 @@ from ..utils import emoji_image_file
 _HOTKEY_JS_CODE = (pathlib.Path(__file__).parent / 'hotkeys.js').read_text()
 
 
-def create_annotation_tab(repo: DatasetRepository, demo: gr.Blocks,
-                          datasource: Iterable[ImageItem], write_session: WriterSession, state_file: str,
-                          fn_annotate_assist: Optional[Callable[[str], Any]] = None,
-                          **kwargs):
+def create_annotation_tab(
+        repo: DatasetRepository, demo: gr.Blocks,
+        datasource: Iterable[ImageItem], write_session: WriterSession, state_file: str,
+        fn_annotate_assist: Optional[Callable[[str], Any]] = None, **kwargs
+):
     data_iterator = iter(datasource)
 
     gr_state_output = gr.State(value=None)
