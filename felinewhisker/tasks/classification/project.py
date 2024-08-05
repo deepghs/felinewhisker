@@ -1,6 +1,7 @@
 import json
 import os
 import random
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Callable
 
 import pandas as pd
@@ -34,6 +35,13 @@ def create_readme_for_classification(f, workdir: str, task_meta_info: dict, df_s
 
     sample_cnt = 8
     samples = []
+    tp = ThreadPoolExecutor(max_workers=12)
+
+    def _load_preview_image(sample_id, dst_img_file):
+        image = padding_align(fn_load_image(sample_id), (512, 768), color='#00000000')
+        os.makedirs(os.path.dirname(dst_img_file), exist_ok=True)
+        image.save(dst_img_file)
+
     for label in labels:
         df_label = df_samples[df_samples['annotation'] == label]
         row = {
@@ -44,17 +52,18 @@ def create_readme_for_classification(f, workdir: str, task_meta_info: dict, df_s
         if len(ids) > sample_cnt:
             ids = random.sample(ids, k=sample_cnt)
         selected = df_label[df_label['id'].isin(ids)].to_dict('records')
+
         for i in range(sample_cnt):
             if i < len(selected):
                 selected_item = selected[i]
                 dst_image_file = os.path.join(samples_dir, label, f'{i}.webp')
-                image = padding_align(fn_load_image(selected_item["id"]), (512, 768), color='#00000000')
-                os.makedirs(os.path.dirname(dst_image_file), exist_ok=True)
-                image.save(dst_image_file)
+                tp.submit(_load_preview_image, selected_item['id'], dst_image_file)
                 row[f'Sample #{i}'] = f'![{label}-{i}]({hf_normpath(os.path.relpath(dst_image_file, workdir))})'
             else:
                 row[f'Sample #{i}'] = 'N/A'
         samples.append(row)
+
+    tp.shutdown(wait=True)
     df_samples = pd.DataFrame(samples)
     print(df_samples.to_markdown(index=False), file=f)
     print(f'', file=f)

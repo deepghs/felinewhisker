@@ -8,7 +8,10 @@ _DEFAULT_HOTKEY_MAPS = [
 ]
 _DEFAULT = object()
 
-_HOTKEY_EMOJIS = set((str(i) for i in range(1, 10)))
+_HOTKEY_EMOJIS = {
+    *(str(i) for i in range(1, 10)),
+    *(chr(ord('a') + i) for i in range(26))
+}
 
 
 def create_ui_for_classification(repo, block: gr.Blocks, gr_output_state: gr.State, hotkey_maps=_DEFAULT):
@@ -40,7 +43,7 @@ def create_ui_for_classification(repo, block: gr.Blocks, gr_output_state: gr.Sta
                         elem_classes='btn-label',
                         interactive=False,
                         icon=(
-                            emoji_image_file(f':keycap_{hotkey_maps[i]}:')
+                            emoji_image_file(f':keycap_{hotkey_maps[i].upper()}:')
                             if hotkey_maps[i] in _HOTKEY_EMOJIS else None
                         ),
                     ) for i, (label, btn_id) in enumerate(zip(labels, btn_label_ids))]
