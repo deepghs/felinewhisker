@@ -1,11 +1,12 @@
 from typing import Type, Dict, Callable, Tuple
 
+import gradio as gr
 import pandas as pd
 from PIL import Image
 
 from .base import AnnotationChecker
 from .classification import ClassificationAnnotationChecker, create_readme_for_classification, \
-    init_project_for_classification
+    init_project_for_classification, create_ui_for_classification
 
 # Task Annotation checkers
 _KNOWN_TASK_CHECKERS: Dict[str, Type[AnnotationChecker]] = {}
@@ -53,4 +54,27 @@ def init_project(task_type: str, workdir: str, task_name: str, readme_metadata: 
         task_name=task_name,
         readme_metadata=readme_metadata,
         **kwargs
+    )
+
+
+# annotator creators
+_KNOWN_ANNOTATOR_CREATOR: Dict[str, Callable] = {}
+
+
+def _register_annotator_maker(task_type: str, fn_creator: Callable):
+    _KNOWN_ANNOTATOR_CREATOR[task_type] = fn_creator
+
+
+_register_annotator_maker('classification', create_ui_for_classification)
+
+
+def create_ui_for_annotator(repo, block: gr.Blocks, gr_output_state: gr.State, **kwargs) -> gr.State:
+    from ..repository import DatasetRepository
+    repo: DatasetRepository
+
+    return _KNOWN_ANNOTATOR_CREATOR[repo.meta_info['task']](
+        repo=repo,
+        block=block,
+        gr_output_state=gr_output_state,
+        **kwargs,
     )

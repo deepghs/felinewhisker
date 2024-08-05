@@ -1,0 +1,1 @@
+from .dispatch import create_annotator_app

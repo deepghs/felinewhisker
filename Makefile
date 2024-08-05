@@ -19,6 +19,9 @@ RANGE_SRC_DIR  := ${SRC_DIR}/${RANGE_DIR}
 
 COV_TYPES ?= xml term-missing
 
+LESS_FILE = $(shell find ${SRC_DIR} -name '*.less')
+CSS_FILE := $(patsubst %.less,%.css,$(LESS_FILE))
+
 package:
 	$(PYTHON) -m build --sdist --wheel --outdir ${DIST_DIR}
 build:
@@ -42,3 +45,10 @@ docs:
 	$(MAKE) -C "${DOC_DIR}" build
 pdocs:
 	$(MAKE) -C "${DOC_DIR}" prod
+
+build_css: ${CSS_FILE}
+%.css: %.less
+	lesscpy $< $@
+build_clean:
+	rm -rf ${CSS_FILE}
+

@@ -1,0 +1,20 @@
+#annotation_title .title {
+  font-size: 30px;
+  text-align: center;
+}
+#annotation_workspace .limit-height {
+  max-height: 75vh;
+}
+#annotation_workspace .btn-selected {
+  border: 2px solid blue !important;
+  box-shadow: 0 0 10px rgba(0,0,255,0.5);
+}
+#annotation_workspace .tip-text {
+  font-size: 20px;
+}
+#annotation_workspace .tip-text.right {
+  text-align: right;
+}
+#annotation_workspace .btn-label {
+  font-size: 22px;
+}

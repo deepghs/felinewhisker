@@ -60,6 +60,9 @@ class BaseDataSource:
         self._status = 'idle'
         self._fn_contains_id = fn_contains_id or (lambda x: False)
 
+    def set_fn_contains_id(self, fn_contains_id: Optional[Callable[[str], bool]] = None):
+        self._fn_contains_id = fn_contains_id or (lambda x: False)
+
     def _iter(self):
         raise NotImplementedError  # pragma: no cover
 
