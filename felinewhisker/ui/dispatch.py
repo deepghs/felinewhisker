@@ -1,6 +1,6 @@
 import pathlib
 from contextlib import contextmanager
-from typing import Optional, ContextManager
+from typing import Optional, ContextManager, Callable, Any
 
 import gradio as gr
 from hbutils.string import titleize
@@ -13,9 +13,11 @@ _GLOBAL_CSS_CODE = (pathlib.Path(__file__).parent / 'global.css').read_text()
 
 
 @contextmanager
-def create_annotator_app(repo: DatasetRepository, datasource: BaseDataSource, author: Optional[str] = None,
-                         annotation_options: Optional[dict] = None) \
-        -> ContextManager[gr.Blocks]:
+def create_annotator_app(
+        repo: DatasetRepository, datasource: BaseDataSource, author: Optional[str] = None,
+        fn_annotate_assist: Optional[Callable[[str], Any]] = None,
+        annotation_options: Optional[dict] = None
+) -> ContextManager[gr.Blocks]:
     with repo.write(author=author) as write_session:
         with datasource as source:
             source.set_fn_contains_id(write_session.is_id_duplicated)
@@ -37,6 +39,7 @@ def create_annotator_app(repo: DatasetRepository, datasource: BaseDataSource, au
                                 demo=demo,
                                 datasource=source,
                                 write_session=write_session,
+                                fn_annotate_assist=fn_annotate_assist,
                                 **(annotation_options or {}),
                             )
 

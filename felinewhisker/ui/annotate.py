@@ -1,5 +1,5 @@
 import pathlib
-from typing import Iterable
+from typing import Iterable, Callable, Optional, Any
 
 import gradio as gr
 from hbutils.string import plural_word
@@ -13,7 +13,8 @@ _HOTKEY_JS_CODE = (pathlib.Path(__file__).parent / 'hotkeys.js').read_text()
 
 
 def create_annotation_tab(repo: DatasetRepository, demo: gr.Blocks,
-                          datasource: Iterable[ImageItem], write_session: WriterSession, **kwargs):
+                          datasource: Iterable[ImageItem], write_session: WriterSession,
+                          fn_annotate_assist: Optional[Callable[[str], Any]] = None, **kwargs):
     data_iterator = iter(datasource)
 
     gr_state_output = gr.State(value=None)
@@ -104,6 +105,15 @@ def create_annotation_tab(repo: DatasetRepository, demo: gr.Blocks,
         sample_id = ids[idx]
         annotation = write_session[sample_id]
         image_file = write_session.get_image_path(sample_id)
+
+        if fn_annotate_assist and annotation is None:
+            annotation = fn_annotate_assist(image_file)
+            if annotation is not None:
+                write_session[sample_id] = annotation
+                gr.Info(f'Sample #{idx} auto-annotated by assistant - {annotation!r}.')
+            else:
+                gr.Warning(f'No recommendation for sample #{idx}.')
+
         return (idx, sample_id, image_file, annotation), \
             gr.update(interactive=idx > 0), \
             gr.update(interactive=max_length is None or idx < max_length - 1), \
