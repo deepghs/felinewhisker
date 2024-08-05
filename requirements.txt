@@ -14,3 +14,5 @@ pyarrow
 tabulate
 cheesechaser>=0.0.1
 gradio>=4
+emoji
+pilmoji

@@ -1,5 +1,7 @@
 import gradio as gr
 
+from ...utils import emoji_image_file
+
 _DEFAULT_HOTKEY_MAPS = [
     *(str(i) for i in range(1, 10)),
     *(chr(ord('a') + i) for i in range(26))
@@ -22,66 +24,76 @@ def create_ui_for_classification(repo, block: gr.Blocks, gr_output_state: gr.Sta
             gr_sample = gr.Image(type='pil', label='', elem_classes='limit-height')
 
         with gr.Column(elem_classes='limit-height'):
-            gr_annotation = gr.State(value=object())
+            with gr.Row():
+                with gr.Column():
+                    gr_annotation = gr.State(value=object())
 
-            btn_label_ids = [f'btn_label_{label}' for i, label in enumerate(labels)]
-            btns = [gr.Button(
-                value=f'{label} ({hotkey_maps[i].upper()})',
-                elem_id=btn_id,
-                elem_classes='btn-label',
-                interactive=False,
-            ) for i, (label, btn_id) in enumerate(zip(labels, btn_label_ids))]
+                    btn_label_ids = [f'btn_label_{label}' for i, label in enumerate(labels)]
+                    btns = [gr.Button(
+                        value=f'{label} ({hotkey_maps[i].upper()})',
+                        elem_id=btn_id,
+                        elem_classes='btn-label',
+                        interactive=False,
+                    ) for i, (label, btn_id) in enumerate(zip(labels, btn_label_ids))]
 
-            def _annotation_transition(annotation, triggered_state):
-                new_state = triggered_state if (annotation != triggered_state) else None
-                return new_state
+                    def _annotation_transition(annotation, triggered_state):
+                        new_state = triggered_state if (annotation != triggered_state) else None
+                        return new_state
 
-            for i, label in enumerate(labels):
-                gr_button = btns[i]
-                gr_button.click(
+                    for i, label in enumerate(labels):
+                        gr_button = btns[i]
+                        gr_button.click(
+                            fn=_annotation_transition,
+                            inputs=[gr_annotation, gr.State(value=label)],
+                            outputs=[gr_annotation],
+                        )
+
+            with gr.Row():
+                gr_unannotate_button = gr.Button(
+                    value='Unannotate',
+                    elem_id='btn_unannoate_label',
+                    icon=emoji_image_file(':no_entry:'),
+                    interactive=False,
+                )
+                gr_unannotate_button.click(
                     fn=_annotation_transition,
-                    inputs=[gr_annotation, gr.State(value=label)],
+                    inputs=[gr_annotation, gr.State(value=None)],
                     outputs=[gr_annotation],
                 )
 
-            gr_unannotate_button = gr.Button(
-                value='Unannotate',
-                elem_id='btn_unannoate_label',
-                visible=False,
-            )
-            gr_unannotate_button.click(
-                fn=_annotation_transition,
-                inputs=[gr_annotation, gr.State(value=None)],
-                outputs=[gr_annotation],
-            )
-
-            def _annotation_changed(current_position_id, state):
-                new_btns = [
-                    gr.Button(
-                        value=f'{label} ({hotkey_maps[i].upper()})',
-                        elem_id=btn_id,
-                        elem_classes='btn-label btn-selected' if state and label == state else 'btn-label',
+                def _annotation_changed(current_position_id, state):
+                    new_btns = [
+                        gr.Button(
+                            value=f'{label} ({hotkey_maps[i].upper()})',
+                            elem_id=btn_id,
+                            elem_classes='btn-label btn-selected' if state and label == state else 'btn-label',
+                            interactive=True,
+                        ) for i, (label, btn_id) in enumerate(zip(labels, btn_label_ids))
+                    ]
+                    unannotate_button = gr.Button(
+                        value='Unannotate',
+                        elem_id='btn_unannoate_label',
+                        icon=emoji_image_file(':no_entry:'),
                         interactive=True,
-                    ) for i, (label, btn_id) in enumerate(zip(labels, btn_label_ids))
-                ]
-                if state:
-                    state_html = f'<p>Current Sample: #{current_position_id}</p>' \
-                                 f'<p>Annotated: <b>{state}</b></p>'
-                else:
-                    state_html = f'<p>Current Sample: #{current_position_id}</p>' \
-                                 f'<p>Unannotated</p>'
-                return state_html, *new_btns
+                    )
+                    if state:
+                        state_html = f'<p>Current Sample: #{current_position_id}</p>' \
+                                     f'<p>Annotated: <b>{state}</b></p>'
+                    else:
+                        state_html = f'<p>Current Sample: #{current_position_id}</p>' \
+                                     f'<p>Unannotated</p>'
+                    return state_html, unannotate_button, *new_btns
 
-            gr_annotation_text = gr.HTML(elem_classes='tip-text right')
-            gr_annotation.change(
-                fn=_annotation_changed,
-                inputs=[gr_position_id, gr_annotation],
-                outputs=[gr_annotation_text, *btns],
-            ).then(
-                fn=lambda _id, _annotation: (_id, _annotation),
-                inputs=[gr_sample_id, gr_annotation],
-                outputs=[gr_output_state],
-            )
+                gr_annotation_text = gr.HTML(elem_classes='tip-text right')
+                gr_annotation.change(
+                    fn=_annotation_changed,
+                    inputs=[gr_position_id, gr_annotation],
+                    outputs=[gr_annotation_text, gr_unannotate_button, *btns],
+                ).then(
+                    fn=lambda _id, _annotation: (_id, _annotation),
+                    inputs=[gr_sample_id, gr_annotation],
+                    outputs=[gr_output_state],
+                )
 
             js_elses = " else ".join([
                 f"if (event.key === {str(hotkey_maps[i])!r}) {{ document.getElementById({btn_id!r}).click(); }}"
@@ -114,7 +126,7 @@ def create_ui_for_classification(repo, block: gr.Blocks, gr_output_state: gr.Sta
         ).then(
             fn=_annotation_changed,
             inputs=[gr_position_id, gr_annotation],
-            outputs=[gr_annotation_text, *btns],
+            outputs=[gr_annotation_text, gr_unannotate_button, *btns],
         )
 
     return gr_state_input
