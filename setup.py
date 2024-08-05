@@ -38,7 +38,7 @@ setup(
     version=meta['__VERSION__'],
     packages=find_packages(include=(_MODULE_NAME, "%s.*" % _MODULE_NAME)),
     package_data={
-        package_name: ['*.yaml', '*.yml', '*.json', '*.png']
+        package_name: ['*.yaml', '*.yml', '*.json', '*.png', '*.js', '*.css']
         for package_name in find_packages(include=('*'))
     },
     description=meta['__DESCRIPTION__'],
