@@ -8,6 +8,8 @@ _DEFAULT_HOTKEY_MAPS = [
 ]
 _DEFAULT = object()
 
+_HOTKEY_EMOJIS = set((str(i) for i in range(1, 10)))
+
 
 def create_ui_for_classification(repo, block: gr.Blocks, gr_output_state: gr.State, hotkey_maps=_DEFAULT):
     from ...repository import DatasetRepository
@@ -30,10 +32,17 @@ def create_ui_for_classification(repo, block: gr.Blocks, gr_output_state: gr.Sta
 
                     btn_label_ids = [f'btn_label_{label}' for i, label in enumerate(labels)]
                     btns = [gr.Button(
-                        value=f'{label} ({hotkey_maps[i].upper()})',
+                        value=(
+                            f'({hotkey_maps[i].upper()}) {label}'
+                            if hotkey_maps[i] not in _HOTKEY_EMOJIS else label
+                        ),
                         elem_id=btn_id,
                         elem_classes='btn-label',
                         interactive=False,
+                        icon=(
+                            emoji_image_file(f':keycap_{hotkey_maps[i]}:')
+                            if hotkey_maps[i] in _HOTKEY_EMOJIS else None
+                        ),
                     ) for i, (label, btn_id) in enumerate(zip(labels, btn_label_ids))]
 
                     def _annotation_transition(annotation, triggered_state):
@@ -63,19 +72,12 @@ def create_ui_for_classification(repo, block: gr.Blocks, gr_output_state: gr.Sta
 
                 def _annotation_changed(current_position_id, state):
                     new_btns = [
-                        gr.Button(
-                            value=f'{label} ({hotkey_maps[i].upper()})',
-                            elem_id=btn_id,
+                        gr.update(
                             elem_classes='btn-label btn-selected' if state and label == state else 'btn-label',
                             interactive=True,
                         ) for i, (label, btn_id) in enumerate(zip(labels, btn_label_ids))
                     ]
-                    unannotate_button = gr.Button(
-                        value='Unannotate',
-                        elem_id='btn_unannoate_label',
-                        icon=emoji_image_file(':no_entry:'),
-                        interactive=True,
-                    )
+                    unannotate_button = gr.update(interactive=True if state else False)
                     if state:
                         state_html = f'<p>Current Sample: #{current_position_id}</p>' \
                                      f'<p>Annotated: <b>{state}</b></p>'
