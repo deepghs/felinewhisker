@@ -2,8 +2,15 @@
   font-size: 30px;
   text-align: center;
 }
+#annotation_title .subtitle {
+  font-size: 23px;
+  text-align: center;
+}
+#annotation_title .subtitle.negative {
+  color: darkgray;
+}
 #annotation_workspace .limit-height {
-  max-height: 75vh;
+  max-height: 67vh;
 }
 #annotation_workspace .btn-selected {
   border: 2px solid blue !important;
