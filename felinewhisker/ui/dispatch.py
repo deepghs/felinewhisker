@@ -8,6 +8,7 @@ from hbutils.string import titleize
 from hbutils.system import TemporaryDirectory
 
 from .annotate import create_annotation_tab
+from .squash import create_squash_tab
 from ..datasource import BaseDataSource
 from ..repository import DatasetRepository
 
@@ -45,6 +46,12 @@ def create_annotator_app(
                             state_file=state_file,
                             fn_annotate_assist=fn_annotate_assist,
                             **(annotation_options or {}),
+                        )
+
+                    with gr.Tab('Squash'):
+                        create_squash_tab(
+                            repo=repo,
+                            demo=demo,
                         )
 
         yield demo

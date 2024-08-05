@@ -14,7 +14,7 @@ _HOTKEY_EMOJIS = {
 }
 
 
-def create_ui_for_classification(repo, block: gr.Blocks, gr_output_state: gr.State, hotkey_maps=_DEFAULT):
+def create_annotator_ui_for_classification(repo, block: gr.Blocks, gr_output_state: gr.State, hotkey_maps=_DEFAULT):
     from ...repository import DatasetRepository
     repo: DatasetRepository
 

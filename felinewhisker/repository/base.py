@@ -3,9 +3,10 @@ import shutil
 import tarfile
 import time
 from threading import Lock
-from typing import Optional, Callable
+from typing import Optional, Callable, List, Tuple
 
 import pandas as pd
+from PIL import Image
 from hbutils.random import random_sha1_with_timestamp
 from hbutils.system import TemporaryDirectory
 from tqdm import tqdm
@@ -44,10 +45,13 @@ class WriterSession:
                 self._checker.check(annotation)
             _, ext = os.path.splitext(os.path.basename(image_file))
             filename = f'{id_}{ext}'
+            width, height = Image.open(image_file).size
             shutil.copyfile(image_file, os.path.join(self._storage_tmpdir.name, filename))
             self._records[id_] = {
                 'id': id_,
                 'filename': filename,
+                'width': width,
+                'height': height,
                 'annotation': annotation,
                 'updated_at': time.time(),
                 'author': self._author,
@@ -133,15 +137,40 @@ class DatasetRepository:
     def _write(self, tar_file: str, data_file: str, token: str):
         raise NotImplementedError  # pragma: no cover
 
-    def _read(self):
+    def _read_meta(self):
         raise NotImplementedError  # pragma: no cover
 
     def _squash(self):
         raise NotImplementedError  # pragma: no cover
 
+    def _get_table_file(self) -> Optional[str]:
+        raise NotImplementedError  # pragma: no cover
+
+    def _list_unarchived_table_files(self) -> List[str]:
+        raise NotImplementedError  # pragma: no cover
+
+    def _download_image_file(self, archive_file: str, file_in_archive: str, dst_file: str):
+        raise NotImplementedError  # pragma: no cover
+
     def _sync(self):
-        self.meta_info, self._exist_ids = self._read()
+        self.meta_info, self._exist_ids = self._read_meta()
         self._annotation_checker = parse_annotation_checker_from_meta(self.meta_info)
+
+    def read_table(self) -> Optional[pd.DataFrame]:
+        table_file = self._get_table_file()
+        if table_file:
+            return pd.read_parquet(table_file)
+        else:
+            return None
+
+    def read_unarchived_tables(self) -> List[Tuple[str, pd.DataFrame]]:
+        results = []
+        for file in tqdm(self._list_unarchived_table_files()):
+            results.append((
+                os.path.splitext(os.path.basename(file))[0],
+                pd.read_parquet(file)
+            ))
+        return results
 
     def squash(self):
         with self._lock:

@@ -8,7 +8,7 @@ from hbutils.string import plural_word
 
 from ..datasource import ImageItem
 from ..repository import DatasetRepository, WriterSession
-from ..tasks import create_ui_for_annotator
+from ..tasks import create_annotator_ui
 from ..utils import emoji_image_file
 
 _HOTKEY_JS_CODE = (pathlib.Path(__file__).parent / 'hotkeys.js').read_text()
@@ -61,7 +61,7 @@ def create_annotation_tab(
     )
 
     with gr.Row():
-        gr_state_input = create_ui_for_annotator(
+        gr_state_input = create_annotator_ui(
             repo=repo,
             block=demo,
             gr_output_state=gr_state_output,

@@ -65,7 +65,7 @@ class HfOnlineRepository(DatasetRepository):
                 message=commit_message,
             )
 
-    def _read(self):
+    def _read_meta(self):
         delete_detached_cache(repo_id=self._repo_id, repo_type='dataset')
         hf_fs = get_hf_fs(hf_token=os.environ.get('HF_TOKEN'))
         hf_client = get_hf_client(hf_token=os.environ['HF_TOKEN'])
@@ -93,6 +93,56 @@ class HfOnlineRepository(DatasetRepository):
             exist_ids = set()
 
         return meta_info, exist_ids
+
+    def _get_table_file(self) -> Optional[str]:
+        hf_fs = get_hf_fs(hf_token=os.environ.get('HF_TOKEN'))
+        hf_client = get_hf_client(hf_token=os.environ['HF_TOKEN'])
+
+        if hf_fs.exists(hf_fs_path(
+                repo_id=self._repo_id,
+                repo_type='dataset',
+                revision=self._revision,
+                filename='data.parquet',
+        )):
+            return hf_client.hf_hub_download(
+                repo_id=self._repo_id,
+                repo_type='dataset',
+                revision=self._revision,
+                filename='data.parquet',
+            )
+        else:
+            return None
+
+    def _list_unarchived_table_files(self) -> List[str]:
+        hf_fs = get_hf_fs(hf_token=os.environ.get('HF_TOKEN'))
+        hf_client = get_hf_client(hf_token=os.environ['HF_TOKEN'])
+
+        files = []
+        for filepath in natsorted(hf_fs.glob(hf_fs_path(
+                repo_id=self._repo_id,
+                repo_type='dataset',
+                revision=self._revision,
+                filename='unarchived/*.parquet',
+        ))):
+            filename = parse_hf_fs_path(filepath).filename
+            files.append(hf_client.hf_hub_download(
+                repo_id=self._repo_id,
+                repo_type='dataset',
+                revision=self._revision,
+                filename=filename,
+            ))
+
+        return files
+
+    def _download_image_file(self, archive_file: str, file_in_archive: str, dst_file: str):
+        hf_tar_file_download(
+            repo_id=self._repo_id,
+            repo_type='dataset',
+            revision=self._revision,
+            archive_in_repo=archive_file,
+            file_in_archive=file_in_archive,
+            local_file=dst_file,
+        )
 
     def _squash(self):
         delete_detached_cache(repo_id=self._repo_id, repo_type='dataset')
@@ -137,13 +187,10 @@ class HfOnlineRepository(DatasetRepository):
             with TemporaryDirectory() as ttd:
                 tmp_image_file = os.path.join(
                     ttd, f'image{os.path.splitext(selected_item["filename"])[1]}')
-                hf_tar_file_download(
-                    repo_id=self._repo_id,
-                    repo_type='dataset',
-                    revision=self._revision,
-                    archive_in_repo=selected_item['archive_file'],
+                self._download_image_file(
+                    archive_file=selected_item['archive_file'],
                     file_in_archive=selected_item['filename'],
-                    local_file=tmp_image_file,
+                    dst_file=tmp_image_file,
                 )
 
                 image = Image.open(tmp_image_file)

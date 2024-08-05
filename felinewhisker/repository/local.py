@@ -42,7 +42,7 @@ class LocalRepository(DatasetRepository):
         df = pd.DataFrame(records)
         df.to_parquet(dst_data_file, engine='pyarrow', index=False)
 
-    def _read(self):
+    def _read_meta(self):
         with open(self._meta_info_file, 'r') as f:
             meta_info = json.load(f)
         if os.path.exists(self._data_file):
@@ -50,6 +50,22 @@ class LocalRepository(DatasetRepository):
         else:
             exist_ids = set()
         return meta_info, exist_ids
+
+    def _get_table_file(self) -> Optional[str]:
+        if os.path.exists(self._data_file):
+            return self._data_file
+        else:
+            return None
+
+    def _list_unarchived_table_files(self) -> List[str]:
+        return glob.glob(os.path.join(self._repo_dir, 'unarchived', '*.parquet'))
+
+    def _download_image_file(self, archive_file: str, file_in_archive: str, dst_file: str):
+        tar_file_download(
+            archive_file=os.path.join(self._repo_dir, archive_file),
+            file_in_archive=file_in_archive,
+            local_file=dst_file,
+        )
 
     def _squash(self):
         data_file = os.path.join(self._repo_dir, 'data.parquet')
@@ -77,10 +93,10 @@ class LocalRepository(DatasetRepository):
             with TemporaryDirectory() as ttd:
                 tmp_image_file = os.path.join(
                     ttd, f'image{os.path.splitext(selected_item["filename"])[1]}')
-                tar_file_download(
-                    archive_file=os.path.join(self._repo_dir, selected_item['archive_file']),
+                self._download_image_file(
+                    archive_file=selected_item['archive_file'],
                     file_in_archive=selected_item['filename'],
-                    local_file=tmp_image_file,
+                    dst_file=tmp_image_file,
                 )
 
                 image = Image.open(tmp_image_file)
