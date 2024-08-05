@@ -3,28 +3,14 @@ from contextlib import contextmanager
 from typing import Optional, ContextManager
 
 import gradio as gr
-from hbutils.string import titleize
+from hbutils.string import titleize, plural_word
 
 from ..datasource import BaseDataSource, ImageItem
 from ..repository import DatasetRepository
 from ..tasks import create_ui_for_annotator
 
 _GLOBAL_CSS_CODE = (pathlib.Path(__file__).parent / 'global.css').read_text()
-
-annotation_js_code = """
-function () {
-    document.addEventListener('keydown', function(event) {
-        if (event.key === 'ArrowLeft') {
-            document.querySelector('#left-button').click();
-        } else if (event.key === 'ArrowRight') {
-            document.querySelector('#right-button').click();
-        } else if (event.ctrlKey && event.key === 's') {
-            event.preventDefault();
-            document.querySelector('#save-button').click();
-        }
-    });
-}
-"""
+_HOTKEY_JS_CODE = (pathlib.Path(__file__).parent / 'hotkeys.js').read_text()
 
 
 @contextmanager
@@ -59,9 +45,9 @@ def create_annotator_app(repo: DatasetRepository, datasource: BaseDataSource, au
                                 )
 
                             with gr.Row():
-                                gr_prev = gr.Button(value='Previous', elem_id='left-button')
-                                gr_next = gr.Button(value='Next', elem_id='right-button')
-                                gr_save = gr.Button(value='Save', elem_id='save-button')
+                                gr_prev = gr.Button(value='Prev (←)', elem_id='left-button')
+                                gr_next = gr.Button(value='Next (→)', elem_id='right-button')
+                                gr_save = gr.Button(value='Save (Ctrl+S)', elem_id='save-button')
 
                             def _fn_prev(idx, ids):
                                 if idx <= 0:
@@ -124,14 +110,15 @@ def create_annotator_app(repo: DatasetRepository, datasource: BaseDataSource, au
                             )
 
                             def _fn_save():
-                                gr.Info('Saving ...')
+                                save_count = write_session.get_annotated_count()
+                                gr.Info(f'Saving {plural_word(save_count, "annotated sample")} ...')
                                 write_session.save()
-                                gr.Info('Saved!')
+                                gr.Info(f'{plural_word(save_count, "sample")} saved!')
 
                             gr_save.click(
                                 fn=_fn_save,
                             )
 
-                            demo.load(None, js=annotation_js_code)
+                            demo.load(None, js=_HOTKEY_JS_CODE)
 
             yield demo

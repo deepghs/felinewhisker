@@ -31,6 +31,13 @@ class WriterSession:
         with self._lock:
             return id_ in self._records or self._fn_contains_id(id_)
 
+    def get_annotated_count(self) -> int:
+        count = 0
+        for item in self._records.values():
+            if item['annotation'] is not None:
+                count += 1
+        return count
+
     def add(self, id_: str, image_file: str, annotation):
         with self._lock:
             if annotation is not None:
