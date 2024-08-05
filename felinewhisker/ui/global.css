@@ -18,3 +18,9 @@
 #annotation_workspace .btn-label {
   font-size: 22px;
 }
+#squash_workspace .tip-text {
+  font-size: 20px;
+}
+#squash_workspace .tip-text.right {
+  text-align: right;
+}
