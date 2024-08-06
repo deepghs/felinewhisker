@@ -131,6 +131,43 @@ ids = GelbooruIdQuery(  # query from gelbooru with these tags
 datasource = CheeseChaserDataSource(db_pool, id_generator=ids, source_id='gelbooru')
 ```
 
+#### Use An Annotation Assistant
+
+Something we can speedup the annotation by using an annotation assistant (e.g. the last version of model you just
+trained / some classic-CV-based rough algorithm).
+
+```python
+from PIL import Image
+
+from felinewhisker.datasource import LocalDataSource
+from felinewhisker.repository import HfOnlineRepository
+from felinewhisker.ui import create_annotator_app
+
+repo = HfOnlineRepository('your/hf_repo')
+datasource = LocalDataSource('/data/images/dir')
+
+
+def your_prediction_func(image_file: str):
+    image = Image.open(image_file)
+    # doing something
+    return 'label'  # return a valid annotation value
+
+
+if __name__ == '__main__':
+    with create_annotator_app(
+            repo=repo,
+            datasource=datasource,
+            fn_annotate_assist=your_prediction_func,
+            annotation_options=dict(
+                # you can use hotkeys you like when doing annotations
+                # hotkey_maps=['a', 'b', 'c', 'd', 'e'],
+            ),
+    ) as demo:
+        demo.launch(server_port=7860)
+
+
+```
+
 #### Squash Them
 
 Enter the `Squash` tab, you will see the main sample table (contains all available samples) and unarchived table (
