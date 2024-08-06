@@ -1,4 +1,4 @@
-.PHONY: docs test unittest resource
+.PHONY: docs test unittest resource build
 
 PYTHON := $(shell which python)
 
@@ -24,7 +24,7 @@ CSS_FILE := $(patsubst %.less,%.css,$(LESS_FILE))
 
 package:
 	$(PYTHON) -m build --sdist --wheel --outdir ${DIST_DIR}
-build:
+build: build_css
 	pyinstaller -D -F -n felinewhisker -c felinewhisker_cli.py
 clean:
 	rm -rf ${DIST_DIR} ${BUILD_DIR} *.egg-info
@@ -49,6 +49,6 @@ pdocs:
 build_css: ${CSS_FILE}
 %.css: %.less
 	lesscpy $< $@
-build_clean:
+clean_css:
 	rm -rf ${CSS_FILE}
 
