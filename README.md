@@ -24,7 +24,7 @@ Smart Data Annotator for Computer Vision Training Tasks, As Smart As Tom's Whisk
 this readme is just a guide for those who really willing to experience the state-of-art features, and API/CLI will
 probably get breaking changed at any time before the v0.0.1 version is formally released, just keep followed.)
 
-Currently, support classification dataset, more task types will be supported via plugin system afterwards.
+Currently, support classification dataset, more task types (multi-label, object detection, regression, composed) will be supported via plugin system afterwards.
 
 ## Install
 
