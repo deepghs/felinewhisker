@@ -103,15 +103,12 @@ class LocalRepository(DatasetRepository):
                 image.load()
                 return image
 
-        md_file = os.path.join(self._repo_dir, 'README.md')
-        with open(md_file, 'w') as f:
-            create_readme(
-                f=f,
-                workdir=self._repo_dir,
-                task_meta_info=self.meta_info,
-                df_samples=df,
-                fn_load_image=_load_image_by_id,
-            )
+        create_readme(
+            workdir=self._repo_dir,
+            task_meta_info=self.meta_info,
+            df_samples=df,
+            fn_load_image=_load_image_by_id,
+        )
 
     def __repr__(self):
         return f'<{self.__class__.__name__} dir: {self._repo_dir!r}>'

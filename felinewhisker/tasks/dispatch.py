@@ -35,11 +35,10 @@ def _register_project_maker(task_type: str, fn_creator: Callable, fn_init_creato
 _register_project_maker('classification', create_readme_for_classification, init_project_for_classification)
 
 
-def create_readme(f, workdir: str, task_meta_info: dict, df_samples: pd.DataFrame,
+def create_readme(workdir: str, task_meta_info: dict, df_samples: pd.DataFrame,
                   fn_load_image: Callable[[str], Image.Image]):
     fn_creator, _ = _KNOWN_README_CREATOR[task_meta_info['task']]
     return fn_creator(
-        f=f,
         workdir=workdir,
         task_meta_info=task_meta_info,
         df_samples=df_samples,

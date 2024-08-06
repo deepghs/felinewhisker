@@ -205,15 +205,12 @@ class HfOnlineRepository(DatasetRepository):
             df = df.sort_values(by=['updated_at', 'id'], ascending=[False, True])
             df.to_parquet(os.path.join(td, 'data.parquet'), engine='pyarrow', index=False)
 
-            md_file = os.path.join(td, 'README.md')
-            with open(md_file, 'w') as f:
-                create_readme(
-                    f=f,
-                    workdir=td,
-                    task_meta_info=self.meta_info,
-                    df_samples=df,
-                    fn_load_image=_load_image_by_id,
-                )
+            create_readme(
+                workdir=td,
+                task_meta_info=self.meta_info,
+                df_samples=df,
+                fn_load_image=_load_image_by_id,
+            )
 
             operations = []
             for root, _, files in os.walk(td):
