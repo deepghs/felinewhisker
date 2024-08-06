@@ -19,9 +19,9 @@ class WriterSession:
                  fn_save: Callable[[str, str, str], None], fn_contains_id: Callable[[str], bool]):
         self._author = author
         self._checker = checker
-        self._token = random_sha1_with_timestamp()
+        self.session_token = random_sha1_with_timestamp()
         if self._author:
-            self._token = f'{self._token}__{self._author}'
+            self.session_token = f'{self.session_token}__{self._author}'
         self._storage_tmpdir = TemporaryDirectory()
         self._records = {}
         self._fn_save = fn_save
@@ -102,7 +102,7 @@ class WriterSession:
             data_file = os.path.join(td, 'data.parquet')
             df = pd.DataFrame(records)
             df.to_parquet(data_file, engine='pyarrow', index=False)
-            self._fn_save(tar_file, data_file, self._token)
+            self._fn_save(tar_file, data_file, self.session_token)
 
     def save(self):
         with self._lock:

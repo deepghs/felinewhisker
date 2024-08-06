@@ -9,4 +9,21 @@ function addHotKeyListeners() {
             document.querySelector('#save-button').click();
         }
     });
+
+    let timeout;
+
+    function resetAutoSaveTimer() {
+        clearTimeout(timeout);
+        timeout = setTimeout(function () {
+            console.log('Auto save disabled.')
+            // console.log('Auto save enabled.')
+            // document.querySelector('#save-button').click();
+        }, 30000);
+    }
+
+    document.addEventListener('mousemove', resetAutoSaveTimer, false);
+    document.addEventListener('keypress', resetAutoSaveTimer, false);
+    document.addEventListener('click', resetAutoSaveTimer, false);
+
+    resetAutoSaveTimer();
 }

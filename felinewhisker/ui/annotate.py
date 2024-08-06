@@ -1,3 +1,6 @@
+import datetime
+import html
+import inspect
 import json
 import os.path
 import pathlib
@@ -12,6 +15,20 @@ from ..tasks import create_annotator_ui
 from ..utils import emoji_image_file
 
 _HOTKEY_JS_CODE = (pathlib.Path(__file__).parent / 'hotkeys.js').read_text()
+
+
+def get_fn_signature(func: Callable) -> str:
+    if hasattr(func, '__name__'):
+        func_name = func.__name__
+    else:
+        func_name = '<fn_anonymous>'
+
+    sig = inspect.signature(func)
+    parameters = sig.parameters
+    param_names = [param for param in parameters]
+
+    formatted_signature = f"{func_name}({', '.join(param_names)})"
+    return formatted_signature
 
 
 def create_annotation_tab(
@@ -86,6 +103,21 @@ def create_annotation_tab(
             icon=emoji_image_file(':floppy_disk:'),
             interactive=False,
         )
+
+    with gr.Row(elem_classes='bottom-state'):
+        with gr.Column(scale=2):
+            gr.HTML(
+                f"<p>Session: <u>{html.escape(write_session.session_token)}</u></p>",
+                elem_classes='bottom-state-session'
+            )
+        with gr.Column(scale=1):
+            if fn_annotate_assist:
+                gr.HTML(
+                    f'<p>Annotation Assistent: <u>{html.escape(get_fn_signature(fn_annotate_assist))}</u></p>',
+                    elem_classes='bottom-state-assistant'
+                )
+        with gr.Column(scale=1):
+            gr_save_state = gr.HTML(elem_classes='bottom-state-save-time')
 
     def _fn_prev(idx, ids):
         if idx <= 0:
@@ -164,16 +196,17 @@ def create_annotation_tab(
     )
 
     def _fn_save():
-        yield gr.update(interactive=False, value='Saving')
+        yield gr.update(interactive=False, value='Saving'), gr.update()
         save_count = write_session.get_annotated_count()
         gr.Info(f'Saving {plural_word(save_count, "annotated sample")} ...')
         write_session.save()
-        yield gr.update(interactive=True, value='Save (Ctrl+S)')
+        yield gr.update(interactive=True, value='Save (Ctrl+S)'), \
+            f'<p>Last Saved at: {datetime.datetime.now()}</p>'
         gr.Info(f'{plural_word(save_count, "sample")} saved!')
 
     gr_save.click(
         fn=_fn_save,
-        outputs=[gr_save],
+        outputs=[gr_save, gr_save_state],
     )
 
     demo.load(None, js=_HOTKEY_JS_CODE)

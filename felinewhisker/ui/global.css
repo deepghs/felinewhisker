@@ -25,6 +25,15 @@
 #annotation_workspace .btn-label {
   font-size: 22px;
 }
+.bottom-state .bottom-state-session {
+  text-align: left;
+}
+.bottom-state .bottom-state-assistant {
+  font-weight: bold;
+}
+.bottom-state .bottom-state-save-time {
+  text-align: right;
+}
 #squash_workspace .tip-text {
   font-size: 20px;
 }
