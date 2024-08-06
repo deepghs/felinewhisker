@@ -164,13 +164,16 @@ def create_annotation_tab(
     )
 
     def _fn_save():
+        yield gr.update(interactive=False, value='Saving')
         save_count = write_session.get_annotated_count()
         gr.Info(f'Saving {plural_word(save_count, "annotated sample")} ...')
         write_session.save()
+        yield gr.update(interactive=True, value='Save (Ctrl+S)')
         gr.Info(f'{plural_word(save_count, "sample")} saved!')
 
     gr_save.click(
         fn=_fn_save,
+        outputs=[gr_save],
     )
 
     demo.load(None, js=_HOTKEY_JS_CODE)
