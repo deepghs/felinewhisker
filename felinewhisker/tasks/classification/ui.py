@@ -118,15 +118,15 @@ def create_annotator_ui_for_classification(repo, block: gr.Blocks, gr_output_sta
 
             block.load(None, js=js_hotkeys)
 
-        gr_state_input = gr.State(value=None)
+        gr_input_state = gr.State(value=None)
 
-        def _state_change(state):
+        def _fn_input_state_change(state):
             position_id, sample_id, image, annotation = state
             return position_id, sample_id, image, annotation
 
-        gr_state_input.change(
-            fn=_state_change,
-            inputs=[gr_state_input],
+        gr_input_state.change(
+            fn=_fn_input_state_change,
+            inputs=[gr_input_state],
             outputs=[gr_position_id, gr_sample_id, gr_sample, gr_annotation]
         ).then(
             fn=_annotation_changed,
@@ -134,4 +134,4 @@ def create_annotator_ui_for_classification(repo, block: gr.Blocks, gr_output_sta
             outputs=[gr_annotation_text, gr_unannotate_button, *btns],
         )
 
-    return gr_state_input
+    return gr_input_state
