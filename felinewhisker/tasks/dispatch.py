@@ -1,44 +1,32 @@
-from typing import Type, Dict, Callable, Tuple
+from typing import Dict, Callable, Type
 
 import gradio as gr
 import pandas as pd
 from PIL import Image
 
-from .base import AnnotationChecker
-from .classification import ClassificationAnnotationChecker, create_readme_for_classification, \
-    init_project_for_classification, create_annotator_ui_for_classification
+from .base import AnnotationChecker, TaskTypeRegistration
+from .classification import ClassificationRegistration
 
-# Task Annotation checkers
-_KNOWN_TASK_CHECKERS: Dict[str, Type[AnnotationChecker]] = {}
+_KNOWN_TASK_TYPES: Dict[str, Type[TaskTypeRegistration]] = {}
 
 
-def _register_task_checker(type_: Type[AnnotationChecker]):
-    _KNOWN_TASK_CHECKERS[type_.__task__] = type_
+def register_task_type(reg_cls: Type[TaskTypeRegistration]):
+    assert reg_cls.__task__, f'Task type should not be empty - {reg_cls!r}.'
+    _KNOWN_TASK_TYPES[reg_cls.__task__] = reg_cls
 
 
-_register_task_checker(ClassificationAnnotationChecker)
+register_task_type(ClassificationRegistration)
 
 
 def parse_annotation_checker_from_meta(meta_info: dict) -> AnnotationChecker:
-    type_ = _KNOWN_TASK_CHECKERS[meta_info['task']]
-    return type_.parse_from_meta(meta_info)
-
-
-# README creators
-_KNOWN_README_CREATOR: Dict[str, Tuple[Callable, Callable]] = {}
-
-
-def _register_project_maker(task_type: str, fn_creator: Callable, fn_init_creator: Callable):
-    _KNOWN_README_CREATOR[task_type] = (fn_creator, fn_init_creator)
-
-
-_register_project_maker('classification', create_readme_for_classification, init_project_for_classification)
+    return _KNOWN_TASK_TYPES[meta_info['task']].parse_annotation_checker(
+        meta_info=meta_info
+    )
 
 
 def create_readme(workdir: str, task_meta_info: dict, df_samples: pd.DataFrame,
                   fn_load_image: Callable[[str], Image.Image]):
-    fn_creator, _ = _KNOWN_README_CREATOR[task_meta_info['task']]
-    return fn_creator(
+    return _KNOWN_TASK_TYPES[task_meta_info['task']].make_readme(
         workdir=workdir,
         task_meta_info=task_meta_info,
         df_samples=df_samples,
@@ -47,8 +35,7 @@ def create_readme(workdir: str, task_meta_info: dict, df_samples: pd.DataFrame,
 
 
 def init_project(task_type: str, workdir: str, task_name: str, readme_metadata: dict, **kwargs):
-    _, fn_init_creator = _KNOWN_README_CREATOR[task_type]
-    return fn_init_creator(
+    return _KNOWN_TASK_TYPES[task_type].init_project(
         workdir=workdir,
         task_name=task_name,
         readme_metadata=readme_metadata,
@@ -56,24 +43,13 @@ def init_project(task_type: str, workdir: str, task_name: str, readme_metadata: 
     )
 
 
-# annotator creators
-_KNOWN_UI_CREATOR: Dict[str, Callable] = {}
-
-
-def _register_ui_maker(task_type: str, fn_creator: Callable):
-    _KNOWN_UI_CREATOR[task_type] = fn_creator
-
-
-_register_ui_maker('classification', create_annotator_ui_for_classification)
-
-
 def create_annotator_ui(repo, block: gr.Blocks, gr_output_state: gr.State, **kwargs) -> gr.State:
     from ..repository import DatasetRepository
     repo: DatasetRepository
 
-    return _KNOWN_UI_CREATOR[repo.meta_info['task']](
+    return _KNOWN_TASK_TYPES[repo.meta_info['task']].create_ui(
         repo=repo,
         block=block,
         gr_output_state=gr_output_state,
-        **kwargs,
+        **kwargs
     )
