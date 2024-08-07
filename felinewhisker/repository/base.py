@@ -11,7 +11,7 @@ from hbutils.random import random_sha1_with_timestamp
 from hbutils.system import TemporaryDirectory
 from tqdm import tqdm
 
-from ..tasks import parse_annotation_checker_from_meta, AnnotationChecker
+from ..tasks import parse_annotation_checker, AnnotationChecker
 
 
 class WriterSession:
@@ -154,7 +154,7 @@ class DatasetRepository:
 
     def _sync(self):
         self.meta_info, self._exist_ids = self._read_meta()
-        self._annotation_checker = parse_annotation_checker_from_meta(self.meta_info)
+        self._annotation_checker = parse_annotation_checker(self.meta_info)
 
     def read_table(self) -> Optional[pd.DataFrame]:
         table_file = self._get_table_file()

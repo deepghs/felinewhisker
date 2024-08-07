@@ -1,3 +1,8 @@
+import logging
+import re
+from typing import Tuple, List, Callable
+
+import click
 import gradio as gr
 import pandas as pd
 
@@ -12,7 +17,7 @@ class ClassificationRegistration(TaskTypeRegistration):
     __cls_annotation_checker__ = ClassificationAnnotationChecker
 
     @classmethod
-    def create_ui(cls, repo, block: gr.Blocks, gr_output_state: gr.State, **kwargs) -> gr.State:
+    def create_annotator_ui(cls, repo, block: gr.Blocks, gr_output_state: gr.State, **kwargs) -> gr.State:
         return create_annotator_ui_for_classification(
             repo=repo,
             block=block,
@@ -38,3 +43,20 @@ class ClassificationRegistration(TaskTypeRegistration):
             df_samples=df_samples,
             fn_load_image=fn_load_image,
         )
+
+    @classmethod
+    def init_cli(cls) -> Tuple[List[Callable], Callable]:
+        options = [
+            click.option('-l', '--labels', 'labels_str', type=str, required=True,
+                         help='Labels for this classification task, seperated with comma.'),
+        ]
+
+        def _fn_parse(labels_str: str):
+            labels = list(filter(bool, map(str.strip, re.split(r'\s*,\s*', labels_str))))
+            logging.info(f'Labels of this task: {labels!r}')
+
+            return dict(
+                labels=labels,
+            )
+
+        return options, _fn_parse

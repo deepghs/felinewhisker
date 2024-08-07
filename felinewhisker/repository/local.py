@@ -13,7 +13,7 @@ from hfutils.index import tar_get_index_info, tar_file_download
 from hfutils.utils import hf_normpath
 
 from .base import DatasetRepository
-from ..tasks import create_readme, init_project
+from ..tasks import make_readme, init_project
 
 
 class LocalRepository(DatasetRepository):
@@ -103,7 +103,7 @@ class LocalRepository(DatasetRepository):
                 image.load()
                 return image
 
-        create_readme(
+        make_readme(
             workdir=self._repo_dir,
             task_meta_info=self.meta_info,
             df_samples=df,
@@ -114,16 +114,16 @@ class LocalRepository(DatasetRepository):
         return f'<{self.__class__.__name__} dir: {self._repo_dir!r}>'
 
     @classmethod
-    def init_classification(cls, local_dir: str, task_name: str, labels: List[str],
-                            readme_metadata: Optional[dict] = None) -> 'LocalRepository':
+    def init(cls, task_type: str, local_dir: str, task_name: str,
+             readme_metadata: Optional[dict] = None, **kwargs) -> 'LocalRepository':
         os.makedirs(local_dir, exist_ok=True)
         readme_metadata = dict(readme_metadata or {})
         init_project(
-            task_type='classification',
+            task_type=task_type,
             workdir=local_dir,
             task_name=task_name,
             readme_metadata=readme_metadata,
-            labels=labels,
+            **kwargs
         )
 
         return LocalRepository(local_dir)

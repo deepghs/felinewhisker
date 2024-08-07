@@ -1,5 +1,6 @@
-from typing import Optional, Callable, Type
+from typing import Optional, Callable, Type, Tuple, List
 
+import click
 import gradio as gr
 import pandas as pd
 from PIL import Image
@@ -28,7 +29,7 @@ class TaskTypeRegistration:
         return cls.__cls_annotation_checker__.parse_from_meta(meta_info)
 
     @classmethod
-    def create_ui(cls, repo, block: gr.Blocks, gr_output_state: gr.State, **kwargs) -> gr.State:
+    def create_annotator_ui(cls, repo, block: gr.Blocks, gr_output_state: gr.State, **kwargs) -> gr.State:
         raise NotImplementedError  # pragma: no cover
 
     @classmethod
@@ -38,4 +39,8 @@ class TaskTypeRegistration:
     @classmethod
     def make_readme(cls, workdir: str, task_meta_info: dict, df_samples: pd.DataFrame,
                     fn_load_image: ImageLoaderTyping):
+        raise NotImplementedError  # pragma: no cover
+
+    @classmethod
+    def init_cli(cls) -> Tuple[List[Callable], Callable]:
         raise NotImplementedError  # pragma: no cover

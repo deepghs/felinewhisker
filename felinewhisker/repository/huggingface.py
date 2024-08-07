@@ -7,7 +7,7 @@ from typing import Optional, List
 import numpy as np
 import pandas as pd
 from PIL import Image
-from hbutils.string import plural_word
+from hbutils.string import plural_word, humanize
 from hbutils.system import TemporaryDirectory
 from hfutils.cache import delete_detached_cache
 from hfutils.index import tar_get_index_info, hf_tar_file_download
@@ -17,7 +17,7 @@ from huggingface_hub import CommitOperationAdd, CommitOperationDelete
 from natsort import natsorted
 
 from .base import DatasetRepository
-from ..tasks import create_readme, init_project
+from ..tasks import make_readme, init_project
 
 
 class HfOnlineRepository(DatasetRepository):
@@ -205,7 +205,7 @@ class HfOnlineRepository(DatasetRepository):
             df = df.sort_values(by=['updated_at', 'id'], ascending=[False, True])
             df.to_parquet(os.path.join(td, 'data.parquet'), engine='pyarrow', index=False)
 
-            create_readme(
+            make_readme(
                 workdir=td,
                 task_meta_info=self.meta_info,
                 df_samples=df,
@@ -236,18 +236,18 @@ class HfOnlineRepository(DatasetRepository):
         return f'<{self.__class__.__name__} repo_id: {self._repo_id!r}, revision: {self._revision!r}>'
 
     @classmethod
-    def init_classification(cls, repo_id: str, task_name: str, labels: List[str],
-                            readme_metadata: Optional[dict] = None) -> 'HfOnlineRepository':
+    def init(cls, task_type: str, repo_id: str, task_name: str,
+             readme_metadata: Optional[dict] = None, **kwargs) -> 'HfOnlineRepository':
         hf_client = get_hf_client(hf_token=os.environ.get('HF_TOKEN'))
         readme_metadata = dict(readme_metadata or {})
 
         with TemporaryDirectory() as td:
             init_project(
-                task_type='classification',
+                task_type=task_type,
                 workdir=td,
                 task_name=task_name,
                 readme_metadata=readme_metadata,
-                labels=labels,
+                **kwargs,
             )
 
             if not hf_client.repo_exists(repo_id=repo_id, repo_type='dataset'):
@@ -258,7 +258,7 @@ class HfOnlineRepository(DatasetRepository):
                 repo_type='dataset',
                 local_directory=td,
                 path_in_repo='.',
-                message=f'Initialize classification task - {task_name!r}',
+                message=f'Initialize {humanize(task_type).lower()} task - {task_name!r}',
                 clear=True,
             )
 

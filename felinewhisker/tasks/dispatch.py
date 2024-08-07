@@ -1,4 +1,4 @@
-from typing import Dict, Callable, Type
+from typing import Dict, Callable, Type, List
 
 import gradio as gr
 import pandas as pd
@@ -18,14 +18,14 @@ def register_task_type(reg_cls: Type[TaskTypeRegistration]):
 register_task_type(ClassificationRegistration)
 
 
-def parse_annotation_checker_from_meta(meta_info: dict) -> AnnotationChecker:
+def parse_annotation_checker(meta_info: dict) -> AnnotationChecker:
     return _KNOWN_TASK_TYPES[meta_info['task']].parse_annotation_checker(
         meta_info=meta_info
     )
 
 
-def create_readme(workdir: str, task_meta_info: dict, df_samples: pd.DataFrame,
-                  fn_load_image: Callable[[str], Image.Image]):
+def make_readme(workdir: str, task_meta_info: dict, df_samples: pd.DataFrame,
+                fn_load_image: Callable[[str], Image.Image]):
     return _KNOWN_TASK_TYPES[task_meta_info['task']].make_readme(
         workdir=workdir,
         task_meta_info=task_meta_info,
@@ -47,9 +47,17 @@ def create_annotator_ui(repo, block: gr.Blocks, gr_output_state: gr.State, **kwa
     from ..repository import DatasetRepository
     repo: DatasetRepository
 
-    return _KNOWN_TASK_TYPES[repo.meta_info['task']].create_ui(
+    return _KNOWN_TASK_TYPES[repo.meta_info['task']].create_annotator_ui(
         repo=repo,
         block=block,
         gr_output_state=gr_output_state,
         **kwargs
     )
+
+
+def init_cli(task_type: str):
+    return _KNOWN_TASK_TYPES[task_type].init_cli()
+
+
+def list_task_types() -> List[str]:
+    return list(_KNOWN_TASK_TYPES.keys())
