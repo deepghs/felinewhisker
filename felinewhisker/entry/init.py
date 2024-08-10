@@ -12,10 +12,14 @@ from huggingface_hub import configure_http_backend
 from prompt_toolkit.document import Document
 from prompt_toolkit.validation import Validator, ValidationError
 
-from .base import CONTEXT_SETTINGS
+from .base import CONTEXT_SETTINGS, ClickWarningException
 from ..repository import LocalRepository, HfOnlineRepository, RepoAlreadyExistsError
 from ..tasks import init_cli, list_task_types
 from ..utils import HuggingFaceRepoValidator, StringNonEmptyValidator, hf_licence
+
+
+class InitCanceledException(ClickWarningException):
+    exit_code = 0x20
 
 
 class NewDirectoryValidator(Validator):
@@ -115,5 +119,7 @@ def _add_init_subcommand(cli: click.Group) -> click.Group:
             ).execute()
             if confirm_clear:
                 fn_init(**init_params, force=True)
+            else:
+                raise InitCanceledException('Initialization cancelled.')
 
     return cli
