@@ -166,6 +166,7 @@ class HfOnlineRepository(DatasetRepository):
             records = {}
 
         files_to_drop = []
+        new_authors = set()
         for filepath in natsorted(hf_fs.glob(hf_fs_path(
                 repo_id=self._repo_id,
                 repo_type='dataset',
@@ -180,6 +181,8 @@ class HfOnlineRepository(DatasetRepository):
                     filename=filename,
             )).to_dict('records'):
                 records[item['id']] = item
+                if item['author']:
+                    new_authors.add(item['author'])
             files_to_drop.append(filename)
 
         def _load_image_by_id(id_: str):
@@ -223,13 +226,18 @@ class HfOnlineRepository(DatasetRepository):
             for file in files_to_drop:
                 operations.append(CommitOperationDelete(path_in_repo=file))
 
+            commit_message = f'Squash {plural_word(len(files_to_drop), "package")}, ' \
+                             f'now this dataset contains {plural_word(len(df), "sample")}'
+            if new_authors:
+                commit_message = f'{commit_message}, ' \
+                                 f'contributed by {", ".join([f"@{name}" for name in sorted(new_authors)])}'
+
             hf_client.create_commit(
                 repo_id=self._repo_id,
                 repo_type='dataset',
                 revision=self._revision,
                 operations=operations,
-                commit_message=f'Squash {plural_word(len(files_to_drop), "package")}, '
-                               f'now this dataset contains {plural_word(len(df), "sample")}'
+                commit_message=commit_message,
             )
 
     def __repr__(self):
