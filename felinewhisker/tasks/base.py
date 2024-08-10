@@ -1,6 +1,5 @@
-from typing import Optional, Callable, Type, Tuple, List
+from typing import Optional, Callable, Type
 
-import click
 import gradio as gr
 import pandas as pd
 from PIL import Image
@@ -42,5 +41,5 @@ class TaskTypeRegistration:
         raise NotImplementedError  # pragma: no cover
 
     @classmethod
-    def init_cli(cls) -> Tuple[List[Callable], Callable]:
+    def init_cli(cls) -> dict:
         raise NotImplementedError  # pragma: no cover

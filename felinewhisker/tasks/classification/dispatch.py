@@ -1,15 +1,14 @@
-import logging
 import re
-from typing import Tuple, List, Callable
 
-import click
 import gradio as gr
 import pandas as pd
+from InquirerPy import inquirer
 
 from .annotation import ClassificationAnnotationChecker
 from .project import create_readme_for_classification, init_project_for_classification
 from .ui import create_annotator_ui_for_classification
 from ..base import TaskTypeRegistration, ImageLoaderTyping
+from ...utils import MultiStringEmptyValidator
 
 
 class ClassificationRegistration(TaskTypeRegistration):
@@ -45,18 +44,17 @@ class ClassificationRegistration(TaskTypeRegistration):
         )
 
     @classmethod
-    def init_cli(cls) -> Tuple[List[Callable], Callable]:
-        options = [
-            click.option('-l', '--labels', 'labels_str', type=str, required=True,
-                         help='Labels for this classification task, seperated with comma.'),
-        ]
-
-        def _fn_parse(labels_str: str):
-            labels = list(filter(bool, map(str.strip, re.split(r'\s*,\s*', labels_str))))
-            logging.info(f'Labels of this task: {labels!r}')
-
-            return dict(
-                labels=labels,
+    def init_cli(cls) -> dict:
+        labels_text = inquirer.text(
+            message='Labels for classification? (Split with comma)',
+            validate=MultiStringEmptyValidator(
+                splitter=',',
+                min_count=2,
+                allow_duplicate=False,
             )
+        ).execute()
 
-        return options, _fn_parse
+        labels = list(filter(bool, map(str.strip, re.split(r'\s*,\s*', labels_text))))
+        return {
+            'labels': labels,
+        }
