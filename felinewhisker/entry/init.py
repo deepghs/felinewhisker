@@ -13,7 +13,7 @@ from prompt_toolkit.document import Document
 from prompt_toolkit.validation import Validator, ValidationError
 
 from .base import CONTEXT_SETTINGS
-from ..repository import LocalRepository, HfOnlineRepository
+from ..repository import LocalRepository, HfOnlineRepository, RepoAlreadyExistsError
 from ..tasks import init_cli, list_task_types
 from ..utils import HuggingFaceRepoValidator, StringNonEmptyValidator, hf_licence
 
@@ -96,10 +96,24 @@ def _add_init_subcommand(cli: click.Group) -> click.Group:
         readme_metadata['tags'] = list(unique([*readme_metadata['tags'], *tags_to_add]))
         readme_metadata['license'] = licence_
         params['readme_metadata'] = readme_metadata
-        fn_init(
+
+        init_params = dict(
             task_type=task_type,
             task_name=task_name,
             **params,
         )
+        if 'force' in init_params:
+            del init_params['force']
+
+        try:
+            fn_init(**init_params, force=False)
+        except RepoAlreadyExistsError:
+            confirm_clear = inquirer.confirm(
+                message='This repository seems to exist.\n'
+                        'if you insist on initializing it, the existing data will be cleaned.\n'
+                        'Are you sure?'
+            ).execute()
+            if confirm_clear:
+                fn_init(**init_params, force=True)
 
     return cli

@@ -14,6 +14,10 @@ from tqdm import tqdm
 from ..tasks import parse_annotation_checker, AnnotationChecker
 
 
+class RepoAlreadyExistsError(Exception):
+    pass
+
+
 class WriterSession:
     def __init__(self, author: Optional[str], checker: AnnotationChecker,
                  fn_save: Callable[[str, str, str], None], fn_contains_id: Callable[[str], bool]):
@@ -152,6 +156,9 @@ class DatasetRepository:
     def _download_image_file(self, archive_file: str, file_in_archive: str, dst_file: str):
         raise NotImplementedError  # pragma: no cover
 
+    def _exist(self) -> bool:
+        raise NotImplementedError  # pragma: no cover
+
     def _sync(self):
         self.meta_info, self._exist_ids = self._read_meta()
         self._annotation_checker = parse_annotation_checker(self.meta_info)
@@ -194,3 +201,7 @@ class DatasetRepository:
     def contains_id(self, id_: str):
         with self._lock:
             return id_ in self._exist_ids
+
+    def is_exist(self):
+        with self._lock:
+            return self._exist()

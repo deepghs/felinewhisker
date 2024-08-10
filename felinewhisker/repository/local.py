@@ -12,8 +12,9 @@ from hbutils.system import TemporaryDirectory
 from hfutils.index import tar_get_index_info, tar_file_download
 from hfutils.utils import hf_normpath
 
-from .base import DatasetRepository
+from .base import DatasetRepository, RepoAlreadyExistsError
 from ..tasks import make_readme, init_project
+from ..utils import clear_directory
 
 
 class LocalRepository(DatasetRepository):
@@ -22,6 +23,9 @@ class LocalRepository(DatasetRepository):
         self._meta_info_file = os.path.join(self._repo_dir, 'meta.json')
         self._data_file = os.path.join(self._repo_dir, 'data.parquet')
         DatasetRepository.__init__(self)
+
+    def _exist(self) -> bool:
+        return os.path.exists(self._meta_info_file)
 
     def _write(self, tar_file: str, data_file: str, token: str):
         date_str = token[:8]
@@ -115,8 +119,12 @@ class LocalRepository(DatasetRepository):
 
     @classmethod
     def init(cls, task_type: str, local_dir: str, task_name: str,
-             readme_metadata: Optional[dict] = None, **kwargs) -> 'LocalRepository':
+             readme_metadata: Optional[dict] = None, force: bool = False, **kwargs) -> 'LocalRepository':
+        if not force and cls(local_dir).is_exist():
+            raise RepoAlreadyExistsError(f'Local repository {local_dir!r} already exist.')
+
         os.makedirs(local_dir, exist_ok=True)
+        clear_directory(local_dir)
         readme_metadata = dict(readme_metadata or {})
         init_project(
             task_type=task_type,

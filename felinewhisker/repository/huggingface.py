@@ -16,7 +16,7 @@ from hfutils.utils import hf_normpath, hf_fs_path, parse_hf_fs_path
 from huggingface_hub import CommitOperationAdd, CommitOperationDelete
 from natsort import natsorted
 
-from .base import DatasetRepository
+from .base import DatasetRepository, RepoAlreadyExistsError
 from ..tasks import make_readme, init_project
 
 
@@ -25,6 +25,15 @@ class HfOnlineRepository(DatasetRepository):
         self._repo_id = repo_id
         self._revision = revision
         DatasetRepository.__init__(self)
+
+    def _exist(self) -> bool:
+        hf_fs = get_hf_fs()
+        return hf_fs.exists(hf_fs_path(
+            repo_id=self._repo_id,
+            repo_type='dataset',
+            filename='meta.json',
+            revision=self._revision,
+        ))
 
     def _write(self, tar_file: str, data_file: str, token: str):
         date_str = token[:8]
@@ -245,7 +254,10 @@ class HfOnlineRepository(DatasetRepository):
 
     @classmethod
     def init(cls, task_type: str, repo_id: str, task_name: str,
-             readme_metadata: Optional[dict] = None, **kwargs) -> 'HfOnlineRepository':
+             readme_metadata: Optional[dict] = None, force: bool = False, **kwargs) -> 'HfOnlineRepository':
+        if not force and cls(repo_id=repo_id).is_exist():
+            raise RepoAlreadyExistsError(f'HF-based repository {repo_id!r} already exist.')
+
         hf_client = get_hf_client(hf_token=os.environ.get('HF_TOKEN'))
         readme_metadata = dict(readme_metadata or {})
 
