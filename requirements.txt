@@ -13,7 +13,7 @@ pyyaml>=6
 pyarrow
 tabulate
 cheesechaser>=0.0.2
-gradio>=4
+gradio>=4.43
 emoji
 pilmoji
 prompt_toolkit

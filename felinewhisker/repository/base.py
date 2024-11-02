@@ -136,7 +136,8 @@ class DatasetRepository:
         self._exist_ids = None
         self._annotation_checker: Optional[AnnotationChecker] = None
         self._lock = Lock()
-        self._sync()
+        if self._exist():
+            self._sync()
 
     def _write(self, tar_file: str, data_file: str, token: str):
         raise NotImplementedError  # pragma: no cover
