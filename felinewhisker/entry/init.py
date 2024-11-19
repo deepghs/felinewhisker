@@ -95,9 +95,10 @@ def _add_init_subcommand(cli: click.Group) -> click.Group:
         tags_to_add = []
         if is_nsfw:
             tags_to_add.append('not-for-all-audiences')
-        if tags_to_add and 'tags' not in readme_metadata:
-            readme_metadata['tags'] = []
-        readme_metadata['tags'] = list(unique([*readme_metadata['tags'], *tags_to_add]))
+        if tags_to_add:
+            if 'tags' not in readme_metadata:
+                readme_metadata['tags'] = []
+            readme_metadata['tags'] = list(unique([*readme_metadata['tags'], *tags_to_add]))
         readme_metadata['license'] = licence_
         params['readme_metadata'] = readme_metadata
 
